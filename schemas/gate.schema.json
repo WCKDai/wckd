@@ -12,16 +12,16 @@
     "reentry": { "type": "boolean", "default": false },
     "artifacts_checked": { "type": "array", "items": { "type": "object", "required": ["path", "valid"], "properties": { "path": { "type": "string" }, "valid": { "type": "boolean" }, "hash": { "type": "string" }, "error": { "type": "string" } } } },
     "criteria": { "type": "array", "items": { "type": "object", "required": ["statement", "met"], "properties": { "statement": { "type": "string" }, "met": { "type": "boolean" }, "evidence": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence" } }, "note": { "type": "string" } } } },
-    "decision": { "type": "string", "enum": ["PASS", "FAIL", "PASS_WITH_CONDITIONS"] },
-    "conditions": { "type": "array", "items": { "type": "object", "required": ["statement", "owner", "due_gate"], "properties": { "statement": { "type": "string" }, "owner": { "$ref": "common.schema.json#/$defs/role" }, "due_gate": { "type": "string" }, "closed_at": { "$ref": "common.schema.json#/$defs/timestamp" } } } },
+    "decision": { "type": "string", "enum": ["PASS", "FAIL", "PASS_WITH_CONDITIONS", "KILL", "WAIT"], "description": "KILL and WAIT are terminal: the project ends (KILL) or sleeps until a tripwire fires (WAIT)." },
+    "conditions": { "type": "array", "items": { "type": "object", "required": ["statement", "owner", "due_gate"], "properties": { "statement": { "type": "string" }, "owner": { "$ref": "common.schema.json#/$defs/role" }, "due_gate": { "type": "string" }, "closed_at": { "$ref": "common.schema.json#/$defs/timestamp" }, "closed_by": { "type": "string" }, "closed_note": { "type": "string" } } } },
     "cost_reestimate": { "type": "object", "properties": { "build": { "$ref": "common.schema.json#/$defs/money" }, "run_monthly": { "$ref": "common.schema.json#/$defs/money" }, "variance_within_class": { "type": "boolean" } } },
     "signoffs": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/signoff" } },
     "human_signoff": { "$ref": "common.schema.json#/$defs/signoff" },
     "notes": { "type": "string" }
   },
   "allOf": [
-    { "if": { "properties": { "gate_id": { "enum": ["G-W", "G-K", "G-D4"] } } }, "then": { "required": ["human_signoff"] } },
-    { "if": { "properties": { "decision": { "const": "PASS_WITH_CONDITIONS" } } }, "then": { "required": ["conditions"] } }
+    { "if": { "properties": { "gate_id": { "enum": ["G-W", "G-K", "G-D4"] }, "decision": { "enum": ["PASS", "PASS_WITH_CONDITIONS"] } }, "required": ["gate_id", "decision"] }, "then": { "required": ["human_signoff"] }, "description": "The three human-veto gates cannot PASS without a human. A FAIL, KILL or WAIT is not a human veto and needs none." },
+    { "if": { "properties": { "decision": { "const": "PASS_WITH_CONDITIONS" } }, "required": ["decision"] }, "then": { "required": ["conditions"] } }
   ],
   "additionalProperties": false
 }

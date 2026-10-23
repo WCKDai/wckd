@@ -65,8 +65,10 @@ wckd/
 │   └── LESSONS.md           read at the start of every Canvass
 ├── templates/project/   what a new project folder looks like
 ├── examples/air-quality-monitor/   a worked W → C → K run (reuse ratio 0.83)
+├── tests/               semantic-check tests for the gate rules
+├── DEFECTS.md           audit of v1.0 against its own spec: fixed and open
 ├── projects/            your runs live here
-└── bin/wckd.py          reference orchestrator: new / next / validate / gate / status
+└── bin/wckd.py          reference orchestrator: new / next / validate / gate / close / status
 ```
 
 ## Run a project
@@ -77,10 +79,12 @@ python bin/wckd.py new aqm "A home air-quality monitor that alerts my phone"
 python bin/wckd.py next aqm       # who runs next, and the exact prompt to hand them
 python bin/wckd.py validate aqm   # every artifact checked against schemas/
 python bin/wckd.py gate aqm G-W --by "your name" --human
+python bin/wckd.py gate aqm G-K --by "your name" --human --decision KILL --note "why it dies"
+python bin/wckd.py close aqm G-W 1 --by "your name"   # close a PASS_WITH_CONDITIONS condition
 python bin/wckd.py status aqm
 ```
 
-`next` prints the agent file, the inputs it must read and the artifact it must write. Hand that to any runtime — a Claude Code subagent, a Cowork task, a scheduled job, a person. The CLI refuses to record a gate when artifacts are missing or invalid, and refuses to skip phases.
+`next` prints the agent file, the inputs it must read and the artifact it must write. Hand that to any runtime — a Claude Code subagent, a Cowork task, a scheduled job, a person. The CLI refuses to record a gate when artifacts are missing or invalid, when an open condition is due, or when a written criterion it can check is unmet; and it refuses to skip phases. `KILL` and `WAIT` are terminal decisions available at any gate. Tests for the semantic checks: `python3 -m unittest discover -s tests`.
 
 ## Plugging into a runtime
 
