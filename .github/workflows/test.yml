@@ -1,0 +1,52 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: install
+        run: python -m pip install --upgrade pip pyyaml jsonschema
+      - name: semantic and end-to-end gate tests
+        run: python -m unittest discover -s tests -v
+      - name: the worked example passes its own gates
+        run: make example
+      - name: every shipped artifact validates against its schema
+        run: |
+          python - <<'PY'
+          import glob, json, sys
+          from jsonschema import Draft202012Validator
+          from referencing import Registry, Resource
+          from referencing.jsonschema import DRAFT202012
+          schemas = {}
+          for p in glob.glob("schemas/*.schema.json"):
+              s = json.load(open(p)); schemas[s["$id"]] = s
+          reg = Registry().with_resources([(k, Resource.from_contents(v, default_specification=DRAFT202012))
+                                           for k, v in schemas.items()])
+          V = {k.rsplit("/", 1)[-1].replace(".schema.json", ""): Draft202012Validator(v, registry=reg)
+               for k, v in schemas.items()}
+          bad = 0
+          for name, path in (("wish", "examples/air-quality-monitor/wish.json"),
+                             ("brief", "examples/air-quality-monitor/brief.json"),
+                             ("landscape", "examples/air-quality-monitor/landscape.json"),
+                             ("verdict", "examples/air-quality-monitor/verdict.json")):
+              errs = list(V[name].iter_errors(json.load(open(path))))
+              print(f"{'ok ' if not errs else 'BAD'} {path}")
+              bad += bool(errs)
+              for e in errs[:3]:
+                  print("   ", "/".join(map(str, e.path)) or "<root>", e.message[:160])
+          sys.exit(1 if bad else 0)
+          PY

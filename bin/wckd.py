@@ -11,6 +11,9 @@
                                               KILL/WAIT are terminal and need a --note reason
   wckd close <slug> <GATE> <index> --by NAME [--note TEXT]
                                               close condition <index> (1-based) on a gate record
+  wckd score <slug> [--strict] [--ledger --by NAME]
+                                              score GOALS.md G1-G12 from the artifacts;
+                                              --ledger appends the row to memory/LEDGER.md (append-only)
 
 The CLI does no domain work. It enforces order, validates artifacts, and records decisions.
 Requires: pip install pyyaml jsonschema
@@ -148,7 +151,10 @@ def check_requirements(gate: dict, pdir: Path, v: Validators):
             p = pdir / r
             if not p.exists():
                 problems.append(f"{r} missing"); continue
-            ok, err = v.check(p, FILE_SCHEMA[r])
+            if r in FILE_SCHEMA:
+                ok, err = v.check(p, FILE_SCHEMA[r])
+            else:      # free-form document required by gates.yaml (lessons.md): presence and substance
+                ok, err = (True, "") if p.read_text().strip() else (False, "document is empty")
             checked.append({"path": r, "valid": ok, "hash": sha256(p), **({"error": err} if err else {})})
             if not ok: problems.append(f"{r}: {err}")
     problems += semantic_checks(gate["id"], pdir)
@@ -260,6 +266,8 @@ def semantic_checks(gid: str, pdir: Path):
                         P.append(f"{cid}: coverage row is marked stale")
                     elif not row.get("best_fit") and not (row.get("gap") or "").strip():
                         P.append(f"{cid}: coverage row names neither a best_fit nor a precise gap")
+                if not L.get("graveyard") and not (L.get("graveyard_note") or "").strip():
+                    P.append("graveyard is empty and no graveyard_note says the space has no history")
                 seen = set()
                 for c in L.get("candidates", []):
                     for f in c.get("fit", []):
@@ -285,7 +293,11 @@ def semantic_checks(gid: str, pdir: Path):
                         P.append(f"blueprint scope contains KEEP capabilities: {sorted(inscope & kept)}")
                 if vd["overall"] != "PROCEED":
                     P.append(f"overall verdict is {vd['overall']}: record it with --decision {vd['overall']} after the Scribe writes memory")
-                elif co and co.get("within_ceiling") is False and not (vd.get("bar_changes") or (b.get("bar") or {}).get("changes")):
+                if vd.get("decisions"):
+                    r = sum(1 for d in vd["decisions"] if d["verdict"] in ("KEEP", "BEND")) / len(vd["decisions"])
+                    if abs(r - vd.get("reuse_ratio", -1)) > 0.02:
+                        P.append(f"reuse_ratio {vd.get('reuse_ratio')} does not match the verdicts ({r:.2f}); G1 is scored on the arithmetic")
+                if co and co.get("within_ceiling") is False and not (vd.get("bar_changes") or (b.get("bar") or {}).get("changes")):
                     P.append("cost totals exceed the budget ceiling with no signed bar_change / ceiling_change")
                 if pr and not pr.get("kill_criteria"):
                     P.append("prospect.json has no kill_criteria; the project cannot fail on paper")
@@ -521,6 +533,217 @@ def cmd_close(a):
     left = [i + 1 for i, x in enumerate(conds) if not x.get("closed_at")]
     print("open conditions on this gate: " + (", ".join(map(str, left)) if left else "none"))
 
+# ---------------------------------------------------------------- goals
+
+GOAL_MARK = {"pass": "✓", "fail": "✗", "na": "n/a", "unknown": "—"}
+GOAL_IDS = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12"]
+
+
+def count_lessons(p: Path):
+    """Lines that look like lessons: a bullet or a numbered item."""
+    if not p.exists():
+        return 0
+    n = 0
+    for line in p.read_text().splitlines():
+        s = line.lstrip()
+        if s.startswith(("-", "*")) or re.match(r"^\d+[.)]\s", s):
+            n += 1
+    return n
+
+
+def compute_goals(pdir: Path):
+    """Score GOALS.md G1-G12 from the artifacts present. Unmeasurable yet is '-' or 'n/a', never a pass."""
+    def J(n):
+        p = pdir / n
+        return load_json(p) if p.exists() else None
+    brief, land, verd, cost, plan, rel, runb = (J(n) for n in ("brief.json", "landscape.json", "verdict.json",
+                                                               "cost.json", "plan.json", "release.json", "runbook.json"))
+    out = []
+
+    def add(gid, status, detail):
+        out.append({"goal": gid, "status": status, "detail": detail})
+
+    # G1 reuse before build
+    if verd and verd.get("decisions"):
+        vs = [d["verdict"] for d in verd["decisions"]]
+        ratio = sum(1 for v in vs if v in ("KEEP", "BEND")) / len(vs)
+        add("G1", "pass" if ratio >= 0.60 else "fail", f"reuse {ratio:.2f} (target >=0.60)")
+    else:
+        add("G1", "unknown", "no verdict yet")
+
+    # G2 nothing built blind
+    if brief and land:
+        caps = [c["id"] for c in brief["capabilities"]]
+        absences = {a["capability_id"] for a in land.get("absence_declarations", [])}
+        classes, cands = {}, {}
+        for r in land.get("search_log", []):
+            classes.setdefault(r["capability_id"], set()).add(r["source_class"])
+        for c in land.get("candidates", []):
+            for f in c.get("fit", []):
+                cands.setdefault(f["capability_id"], set()).add(c["id"])
+        thin = [c for c in caps if c not in absences and (len(classes.get(c, ())) < 5 or len(cands.get(c, ())) < 3)]
+        lo_c = min((len(classes.get(c, ())) for c in caps), default=0)
+        lo_n = min((len(cands.get(c, ())) for c in caps), default=0)
+        add("G2", "pass" if not thin else "fail", f"min {lo_c} source classes / {lo_n} candidates per capability")
+    else:
+        add("G2", "unknown", "no landscape yet")
+
+    # G3 honest kills, at portfolio level
+    overalls = []
+    for p in sorted(PROJECTS.glob("*/verdict.json")):
+        try:
+            overalls.append(load_json(p).get("overall"))
+        except Exception:
+            pass
+    if len(overalls) >= 5:
+        share = sum(1 for o in overalls if o in ("KILL", "WAIT")) / len(overalls)
+        add("G3", "pass" if 0.15 <= share <= 0.40 else "fail", f"{share:.2f} of {len(overalls)} projects killed or waited (0.15-0.40)")
+    else:
+        add("G3", "na", f"portfolio band needs >=5 projects, have {len(overalls)}")
+
+    # G4 priced truth: run estimate vs actual
+    if cost and runb and runb.get("opex_actual"):
+        est = (cost.get("run_monthly") or {}).get("total")
+        actuals = [a.get("amount") for a in runb["opex_actual"] if isinstance(a.get("amount"), (int, float))]
+        if isinstance(est, (int, float)) and est and actuals:
+            act = actuals[-1]
+            add("G4", "pass" if abs(act - est) <= 0.15 * est else "fail",
+                f"run {est:.2f} estimate vs {act:.2f} actual (target +-15%)")
+        else:
+            add("G4", "unknown", "cost or opex_actual not numeric")
+    else:
+        add("G4", "unknown", "no opex actuals yet; scored 90 days after Kept")
+
+    # G5 proven, not promised: crit/high findings that exist at all
+    findings = []
+    bdir = pdir / "breaches"
+    if bdir.exists():
+        for p in sorted(bdir.glob("*.json")):
+            try:
+                findings += load_json(p).get("findings", [])
+            except Exception:
+                pass
+    if findings:
+        esc = [f for f in findings if f.get("severity") in ("crit", "high")]
+        add("G5", "pass" if not esc else "fail", f"{len(esc)} crit/high findings of {len(findings)}")
+    else:
+        add("G5", "unknown", "no breach record yet")
+
+    # G6 broken before shipped
+    if rel:
+        add("G6", "pass" if rel.get("findings_all_dispositioned") else "fail", "every finding dispositioned before Shipped")
+    else:
+        add("G6", "unknown", "not shipped")
+
+    # G7 reversible delivery
+    if rel:
+        drill = (rel.get("rollback") or {}).get("drill_result", "missing")
+        add("G7", "pass" if drill == "pass" else "fail", f"rollback drill: {drill}")
+    else:
+        add("G7", "unknown", "not shipped")
+
+    # G8 kept, not abandoned
+    if runb:
+        owner = ((runb.get("owner") or {}).get("name") or "").strip()
+        slos_ok = all((s.get("alert") or "").strip() for s in runb.get("slos", []))
+        budget = (runb.get("opex_budget_monthly") or {}).get("amount")
+        acts = [a.get("amount") for a in runb.get("opex_actual", []) if isinstance(a.get("amount"), (int, float))]
+        within = (not acts or not budget) or max(acts) <= budget * 1.10
+        ok = owner and owner.lower() not in ("the team", "team") and slos_ok and within
+        add("G8", "pass" if ok else "fail", f"owner '{owner}', {len(runb.get('slos', []))} SLOs with alerts, opex within budget+10%")
+    else:
+        add("G8", "unknown", "no runbook")
+
+    # G9 memory compounds
+    lessons = pdir / "lessons.md"
+    if lessons.exists():
+        n = count_lessons(lessons)
+        add("G9", "pass" if n >= 3 else "fail", f"{n} lessons written (target >=3)")
+    else:
+        add("G9", "unknown", "no lessons.md yet")
+
+    # G10 human in control
+    recs = {r["gate_id"]: r for r in gate_records(pdir)}
+    passed_human = [g for g in ("G-W", "G-K", "G-D4") if (recs.get(g) or {}).get("decision") in PASSING]
+    if passed_human:
+        missing = [g for g in passed_human if not recs[g].get("human_signoff")]
+        add("G10", "pass" if not missing else "fail", f"human sign-off recorded at {', '.join(passed_human)}")
+    else:
+        add("G10", "unknown", "no human-veto gate passed yet")
+
+    # G11 the Bar holds
+    changes = []
+    if brief:
+        changes += (brief.get("bar") or {}).get("changes") or []
+    if verd:
+        changes += verd.get("bar_changes") or []
+    unsig = [c for c in changes if len(c.get("signoffs") or []) < 2]
+    add("G11", "pass" if (len(changes) <= 2 and not unsig) else "fail",
+        f"{len(changes)} bar change(s), {len(unsig)} unsigned (target <=2, all signed)")
+
+    # G12 tried, not read
+    if brief and land:
+        tried = {}
+        for c in land.get("candidates", []):
+            if c.get("tried"):
+                for f in c.get("fit", []):
+                    tried.setdefault(f["capability_id"], set()).add(c["id"])
+        caps = [c["id"] for c in brief["capabilities"]]
+        missing = [c for c in caps if not tried.get(c)]
+        add("G12", "pass" if not missing else "fail", f"{len(caps) - len(missing)}/{len(caps)} capabilities have a candidate actually tried")
+    else:
+        add("G12", "unknown", "no landscape yet")
+    return out
+
+
+def ledger_row(slug, pdir: Path, rows, gate_state_map):
+    def J(n):
+        p = pdir / n
+        return load_json(p) if p.exists() else None
+    b, v, co = J("brief.json"), J("verdict.json"), J("cost.json")
+    wish = ((b or {}).get("restated") or (b or {}).get("wish") or "").replace("|", "/")
+    if len(wish) > 60:
+        wish = wish[:57] + "..."
+    overall = (v or {}).get("overall", "—")
+    ratio = f"{(v or {}).get('reuse_ratio', 0):.2f}" if v else "—"
+    if co:
+        cur, cls = co.get("currency", "USD"), co.get("confidence_class", "rom")
+        build = f"{(co.get('build') or {}).get('total', '—')} {cur} → — ({cls})"
+        run = f"{(co.get('run_monthly') or {}).get('total', '—')} {cur} → — ({cls})"
+    else:
+        build = run = "—"
+    recs = {r["gate_id"]: r for r in gate_records(pdir)}
+    dates = [(recs.get(g) or {}).get("at", "—")[:10] for g in ("G-W", "G-K", "G-D4", "G-D5")]
+    marks = " | ".join(GOAL_MARK[r["status"]] for r in rows)
+    lessons = "lessons.md" if (pdir / "lessons.md").exists() else "—"
+    return (f"| {slug} | {wish} | {overall} | {ratio} | {build} | {run} | "
+            + " | ".join(dates) + f" | {marks} | {lessons} |")
+
+
+def cmd_score(a):
+    pdir = project_dir(a.slug)
+    rows = compute_goals(pdir)
+    print(f"project: {a.slug}\n")
+    width = max(len(r["detail"]) for r in rows)
+    for r in rows:
+        print(f"  {r['goal']:4s} {GOAL_MARK[r['status']]:5s} {r['detail']}")
+    fails = [r["goal"] for r in rows if r["status"] == "fail"]
+    unknown = [r["goal"] for r in rows if r["status"] != "pass"]
+    print(f"\n{len(rows) - len(unknown)}/{len(rows)} goals pass" + (f"; failing: {', '.join(fails)}" if fails else "")
+          + (f"; not yet measurable: {', '.join(g for g in unknown if g not in fails)}" if len(unknown) > len(fails) else ""))
+    if a.ledger:
+        if not a.by:
+            sys.exit("--ledger needs --by NAME (who is writing the row)")
+        led = ROOT / "memory" / "LEDGER.md"
+        text = led.read_text()
+        if re.search(rf"^\| {re.escape(a.slug)} \|", text, re.M):
+            sys.exit(f"memory/LEDGER.md already has a row for {a.slug}; the ledger is append-only, corrections are new rows")
+        row = ledger_row(a.slug, pdir, rows, gate_state(pdir))
+        led.write_text(text.rstrip("\n") + "\n" + row + f"\n<!-- row by {a.by} at {now()} -->\n")
+        print(f"\nappended to memory/LEDGER.md (by {a.by}):\n{row}")
+    if a.strict and fails:
+        sys.exit(1)
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -534,6 +757,8 @@ def main():
     p.add_argument("--condition", action="append"); p.add_argument("--note"); p.set_defaults(fn=cmd_gate)
     p = sp.add_parser("close"); p.add_argument("slug"); p.add_argument("gate"); p.add_argument("index", type=int)
     p.add_argument("--by", required=True); p.add_argument("--note"); p.set_defaults(fn=cmd_close)
+    p = sp.add_parser("score"); p.add_argument("slug"); p.add_argument("--ledger", action="store_true")
+    p.add_argument("--by"); p.add_argument("--strict", action="store_true"); p.set_defaults(fn=cmd_score)
     a = ap.parse_args()
     try:
         rc = a.fn(a)

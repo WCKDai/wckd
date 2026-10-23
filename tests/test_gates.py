@@ -62,6 +62,16 @@ class TestWant(Base):
 
 
 class TestCanvass(Base):
+    def test_empty_graveyard_needs_a_note(self):
+        self.write("brief.json", self.brief)
+        land = copy.deepcopy(self.land)
+        land["graveyard"] = []
+        self.write("landscape.json", land)
+        self.assertTrue(any("graveyard is empty" in p for p in wckd.semantic_checks("G-C", self.pdir)))
+        land["graveyard_note"] = "no prior attempts found in any of the seven source classes"
+        self.write("landscape.json", land)
+        self.assertFalse(any("graveyard is empty" in p for p in wckd.semantic_checks("G-C", self.pdir)))
+
     def test_thin_canvass_is_refused(self):
         self.write("brief.json", self.brief)
         land = copy.deepcopy(self.land)
@@ -102,7 +112,7 @@ class TestCanvass(Base):
 class TestVerdict(Base):
     def _k_artifacts(self):
         verdict = {"id": "v", "brief_id": "b", "landscape_id": "l", "overall": "PROCEED",
-                   "overall_rationale": "r", "reuse_ratio": 0.8,
+                   "overall_rationale": "r", "reuse_ratio": 1.0,
                    "decisions": [{"capability_id": c["id"], "verdict": "KEEP", "chosen_candidate": "cand-ha",
                                   "rationale": "fits", "confidence": 0.8,
                                   "evidence": [{"kind": "url", "locator": "x", "summary": "s", "captured_at": "2026-10-23T00:00:00+00:00",
@@ -151,6 +161,13 @@ class TestVerdict(Base):
         self.write("prospect.json", {"id": "p", "kill_criteria": []})
         self.assertTrue(any("no kill_criteria" in p for p in wckd.semantic_checks("G-K", self.pdir)))
 
+    def test_reuse_ratio_must_match_the_verdicts(self):
+        self._k_artifacts()
+        v = J(self.pdir / "verdict.json")
+        v["reuse_ratio"] = 0.5
+        self.write("verdict.json", v)
+        self.assertTrue(any("does not match the verdicts" in p for p in wckd.semantic_checks("G-K", self.pdir)))
+
     def test_crew_independence(self):
         self._k_artifacts()
         pl = J(self.pdir / "plan.json")
@@ -191,6 +208,39 @@ class TestDeliver(Base):
                                                         "repro": "steps", "blast_radius": "all", "disposition": "open", "evidence": []}],
                                           "provenance": {"produced_by": "breaker", "produced_at": "2026-10-23T00:00:00+00:00"}})
         self.assertTrue(any("open crit finding" in p for p in wckd.semantic_checks("G-D3", self.pdir)))
+
+
+class TestScore(Base):
+    def test_scores_follow_the_artifacts(self):
+        self.write("brief.json", self.brief)
+        self.write("landscape.json", self.land)
+        self.write("verdict.json", {"id": "v", "brief_id": "b", "landscape_id": "l", "overall": "PROCEED",
+                                    "overall_rationale": "r", "reuse_ratio": 0.83,
+                                    "decisions": [{"capability_id": c["id"], "verdict": "KEEP" if c["id"] != "C6" else "BUILD",
+                                                   "chosen_candidate": "cand-ha", "rationale": "r", "confidence": 0.8,
+                                                   "why_not_keep": "g", "why_not_bend": "g", "cited_candidates": ["cand-ha"],
+                                                   "evidence": [{"kind": "url", "locator": "x", "summary": "s",
+                                                                 "captured_at": "2026-10-23T00:00:00+00:00",
+                                                                 "captured_by": "judge", "confidence": 0.8}]}
+                                                  for c in self.brief["capabilities"]],
+                                    "signoffs": [{"by": "judge", "role": "judge", "at": "2026-10-23T00:00:00+00:00",
+                                                  "decision": "approve"}],
+                                    "provenance": {"produced_by": "judge", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        rows = {r["goal"]: r for r in wckd.compute_goals(self.pdir)}
+        self.assertEqual(rows["G1"]["status"], "pass")          # 5 of 6 KEEP/BEND
+        self.assertEqual(rows["G3"]["status"], "na")            # portfolio band needs 5 projects
+        self.assertEqual(rows["G9"]["status"], "unknown")       # no lessons yet
+        (self.pdir / "lessons.md").write_text("# l\n\n- one - *(a)*\n- two - *(b)*\n- three - *(c)*\n")
+        rows = {r["goal"]: r for r in wckd.compute_goals(self.pdir)}
+        self.assertEqual(rows["G9"]["status"], "pass")
+        self.assertEqual(wckd.count_lessons(self.pdir / "lessons.md"), 3)
+
+    def test_ledger_row_shape(self):
+        self.write("brief.json", self.brief)
+        rows = [{"goal": g, "status": "pass", "detail": "d"} for g in wckd.GOAL_IDS]
+        row = wckd.ledger_row("proj", self.pdir, rows, {})
+        self.assertEqual(row.count("|"), 24)                    # 23 separators: 12 goal marks + 11 other cells
+        self.assertTrue(row.startswith("| proj |"))
 
 
 class TestConditions(Base):

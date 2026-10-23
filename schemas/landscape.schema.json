@@ -85,6 +85,7 @@
         "additionalProperties": false
       }
     },
+    "graveyard_note": { "type": "string", "description": "Only for a space with genuinely no history: say so in one sentence, with the search log that supports it. An empty graveyard plus an empty note fails G-C." },
     "coverage": {
       "type": "array",
       "items": {

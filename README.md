@@ -9,6 +9,8 @@ WCKD is a workflow for getting anything made — software, hardware, a product, 
 
 You name a want. A council learns what already exists, what works, what doesn't and why the dead attempts died. It judges every capability KEEP / BEND / BUILD / WAIT / KILL, designs only the gap, prices it (build, run, unit, exit — physical and digital), sizes the prospect and plans it. Crews then build it, prove it, break it, ship it and keep it running, with operating costs tracked against the plan.
 
+A build that could have been a download, a purchase or a configuration change is a failure, even if it works.
+
 ## The four letters
 
 |   | Phase | The question | Produces |
@@ -18,7 +20,20 @@ You name a want. A council learns what already exists, what works, what doesn't 
 | **K** | Keep / Kill | Per capability: keep, bend, build, wait or kill? | `verdict.json` + `blueprint` `cost` `prospect` `plan` |
 | **D** | Deliver | Build → Prove → Harden → Ship → Keep | `workorders/` `proofs/` `breaches/` `release` `runbook` → `memory/` |
 
-Eight gates, each with written criteria and required evidence (`workflows/gates.yaml`). A human holds the veto at **Briefed**, **Judged** and **Shipped**.
+## The eight gates
+
+| Gate | Phase | The question | Human veto |
+|---|---|---|---|
+| **G-W Briefed** | W | Is the want measurable, and is the Bar written? | **yes** |
+| **G-C Canvassed** | C | Did we look wide, try things, and mine the Graveyard? | no |
+| **G-K Judged** | K | Is every capability judged, only the gap designed, everything priced? | **yes** |
+| **G-D1 Built** | D | Does every work order have a build log? | no |
+| **G-D2 Proven** | D | Was it proved independently, from clean, against the Bar? | no |
+| **G-D3 Hardened** | D | Was it attacked, and is every finding dispositioned? | no |
+| **G-D4 Shipped** | D | Is the rollback rehearsed and monitoring live? | **yes** |
+| **G-D5 Kept** | D | Owner, SLOs, opex, lessons, ledger row? | no |
+
+Full criteria and required evidence: `workflows/gates.yaml`. KILL and WAIT are terminal decisions available at any gate, any time.
 
 ## The seventeen roles
 
@@ -41,6 +56,50 @@ Eight gates, each with written criteria and required evidence (`workflows/gates.
 | D | **Breaker** | Adversary: security, abuse, load, chaos, physical stress, cost blow-ups. |
 | D | **Shipper** | Rollout strategy, rollback drill, pilot batch / manufacturing handoff, go/no-go. |
 | D | **Keeper** | Runbook, SLOs, maintenance cadence, opex tracking, drift detection, re-entry triggers. |
+
+## Quickstart
+
+```bash
+pip install pyyaml jsonschema
+make test                                    # 28 tests: gate rules + a full W→D5 run
+ln -sf "$PWD/bin/wckd.py" ~/.local/bin/wckd  # or: python bin/wckd.py <cmd>
+
+wckd new aqm "A home air-quality monitor that alerts my phone"
+wckd next aqm                                # who runs next, what to hand them, what to write
+wckd validate aqm                            # every artifact checked against schemas/
+wckd gate aqm G-W --by "your name" --human   # human-veto gates: G-W, G-K, G-D4
+wckd score aqm                               # GOALS.md G1–G12 scored from the artifacts
+wckd status aqm
+```
+
+`next` prints the agent file, the inputs it must read and the artifact it must write. Hand that to any runtime — a Claude Code subagent, a Cowork task, a scheduled job, a person.
+
+```bash
+# the other outcomes the protocol needs
+wckd gate aqm G-K --by "you" --decision KILL --note "space already solved; nothing to build"
+wckd gate aqm G-K --by "you" --human --decision PASS_WITH_CONDITIONS \
+     --condition "name the CO2 calibration source|barkeeper|G-D4"
+wckd close aqm G-K 1 --by barkeeper          # close the condition when it is met
+wckd score aqm --ledger --by Scribe          # append the row to memory/LEDGER.md (append-only)
+```
+
+## What the CLI actually enforces
+
+Not vibes — the rules that can be checked mechanically:
+
+- phase order: no gate before its predecessors, no build before a Canvassed PASS;
+- artifact validity against `schemas/` (JSON Schema 2020-12), with sha256 of everything a gate checked;
+- **G-C canvass teeth:** ≥5 source classes and ≥3 candidates per capability, or a proven absence; a trial or a
+  stated reason; a coverage row naming a best fit or a precise gap; fresh checks; a non-empty Graveyard or an
+  explicit note that the space has no history;
+- **G-K:** a verdict per capability, blueprint scope free of KEEP, `reuse_ratio` arithmetic, cost inside the
+  ceiling or a signed change, kill criteria, pre-mortem with ≥3 failure modes, crew independence;
+- **G-D2** independence (`validator ≠ builder` plus the attestation), **G-D3** no open crit/high findings,
+  **G-D4** rollback drill + monitoring + cost re-estimate, **G-D5** owner, SLO alerts, re-entry triggers, ≥3 lessons;
+- open `PASS_WITH_CONDITIONS` conditions block the gate they are due at;
+- human sign-off required at G-W, G-K, G-D4 — and refused when absent.
+
+What the CLI cannot check (graveyard substance, provenance hashes, message conformance) the Conductor must read.
 
 ## Layout
 
@@ -65,26 +124,11 @@ wckd/
 │   └── LESSONS.md           read at the start of every Canvass
 ├── templates/project/   what a new project folder looks like
 ├── examples/air-quality-monitor/   a worked W → C → K run (reuse ratio 0.83)
-├── tests/               semantic-check tests for the gate rules
-├── DEFECTS.md           audit of v1.0 against its own spec: fixed and open
+├── tests/               semantic gate tests + a full lifecycle test
+├── DEFECTS.md           this build audited against its own spec
 ├── projects/            your runs live here
-└── bin/wckd.py          reference orchestrator: new / next / validate / gate / close / status
+└── bin/wckd.py          new · next · validate · gate · close · score · status
 ```
-
-## Run a project
-
-```bash
-pip install pyyaml jsonschema
-python bin/wckd.py new aqm "A home air-quality monitor that alerts my phone"
-python bin/wckd.py next aqm       # who runs next, and the exact prompt to hand them
-python bin/wckd.py validate aqm   # every artifact checked against schemas/
-python bin/wckd.py gate aqm G-W --by "your name" --human
-python bin/wckd.py gate aqm G-K --by "your name" --human --decision KILL --note "why it dies"
-python bin/wckd.py close aqm G-W 1 --by "your name"   # close a PASS_WITH_CONDITIONS condition
-python bin/wckd.py status aqm
-```
-
-`next` prints the agent file, the inputs it must read and the artifact it must write. Hand that to any runtime — a Claude Code subagent, a Cowork task, a scheduled job, a person. The CLI refuses to record a gate when artifacts are missing or invalid, when an open condition is due, or when a written criterion it can check is unmet; and it refuses to skip phases. `KILL` and `WAIT` are terminal decisions available at any gate. Tests for the semantic checks: `python3 -m unittest discover -s tests`.
 
 ## Plugging into a runtime
 
@@ -95,3 +139,13 @@ python bin/wckd.py status aqm
 ## Conformance
 
 An implementation is WCKD-compliant when it satisfies `PROTOCOL.md §15`. The short version: no build before Canvassed; verdicts per capability; builder ≠ validator ≠ breaker; every gate has evidence; every cost has a confidence class; every project writes lessons.
+
+## Status
+
+Protocol v1.0, orchestrator v1.0.1. The delivered v1.0 was audited against its own spec: see `DEFECTS.md` for
+what was broken (a KILL that could not be recorded, conditions nobody enforced, a G-C that passed a one-query
+canvass, a G-D5 crash on `lessons.md`), what was fixed, and what is deliberately left to the Conductor.
+
+## License
+
+MIT.
