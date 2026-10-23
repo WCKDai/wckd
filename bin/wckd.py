@@ -15,7 +15,7 @@
 The CLI does no domain work. It enforces order, validates artifacts, and records decisions.
 Requires: pip install pyyaml jsonschema
 """
-import argparse, datetime, hashlib, json, re, shutil, sys
+import argparse, datetime, hashlib, json, os, re, shutil, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -535,7 +535,14 @@ def main():
     p = sp.add_parser("close"); p.add_argument("slug"); p.add_argument("gate"); p.add_argument("index", type=int)
     p.add_argument("--by", required=True); p.add_argument("--note"); p.set_defaults(fn=cmd_close)
     a = ap.parse_args()
-    rc = a.fn(a)
+    try:
+        rc = a.fn(a)
+    except BrokenPipeError:      # `wckd status | head` must not traceback
+        try:
+            sys.stdout.close()
+        except Exception:
+            pass
+        os._exit(0)
     sys.exit(rc if isinstance(rc, int) else 0)
 
 if __name__ == "__main__":
