@@ -1,0 +1,37 @@
+# Digital-specific obligations. The same eight gates apply; these are what a
+# "write some code" interpretation would miss.
+version: "1.1"
+
+threat_model:
+  required_at: G-K
+  contents: [actors, assets, entry points, trust boundaries, top five threats with controls]
+  rule: a digital build with no threat model is an untested security claim
+
+data:
+  classification: what personal, confidential or regulated data enters the system
+  retention: how long it is kept, where, and why - with the deletion path
+  export: the user can get their data out; migration is an exit cost, not an afterthought
+
+licences:
+  rule: every kept dependency's licence is named with its obligations; copyleft is a Bar decision, never a default
+  artefacts: licence identifier per kept candidate, recorded in the cost ledger's keep_costs
+
+supply_chain:
+  sbom: dependency list with versions, written at G-D5
+  pinning: lockfiles for anything that ships
+  update_policy: how patches land, who watches advisories, what breaks a release
+
+operations:
+  observability: logs, metrics and a health signal exist before cutover
+  backup_and_restore: rehearsed before G-D4 wherever state exists
+  quotas: rate limits and spend caps, so a bug cannot become an invoice
+  on_call: a named rota, never "the team"
+  run_cost_itemised: compute, storage, egress, licences, SaaS, support, patching - each a number
+
+exit:
+  migration: data export and dependency exit priced in cost.exit
+  kept_dependency_exits: every KEEP decision carries an exit line, even when that line is zero
+
+review_cadence:
+  drift: quarterly, or on any dependency change
+  reentry: a kept dependency dying, relicensing or changing interface is RE_CANVASS, not a surprise

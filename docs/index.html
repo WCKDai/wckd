@@ -165,6 +165,8 @@
       <li>a physical build with no certification targets or hazard analysis</li>
       <li>a hardware release with a two-unit pilot batch or an unrehearsed recall path</li>
       <li>a hazard with no control</li>
+      <li>a KEEP decision with no priced exit</li>
+      <li>run cost above zero with no itemised lines</li>
     </ul>
   </section>
 
@@ -194,7 +196,9 @@
         <tr><td class="gate">Orchestrated</td><td>&ldquo;run it against my agent&rdquo;</td><td><code>wckd run aqm --agent "claude -p"</code> — stops at every human gate</td></tr>
       </tbody>
     </table>
-    <p class="lede" style="font-size:15px;margin-top:22px"><code>machine/</code> is the protocol compiled to JSON —
+    <p class="lede" style="font-size:15px;margin-top:22px">Both realms carry their own obligations: digital
+      (itemised run cost, priced exits, watched kept dependencies, named environments) and physical (certification,
+      hazard analysis, pilot batch, rehearsed recall, recalibration). <code>machine/</code> is the protocol compiled to JSON —
       phases, gates, roles, tolerances, campaigns, physical obligations and one self-contained schema per artifact —
       so an implementation in any language gates at the same place. <code>wckd conformance</code> proves the schemas
       agree: 16 cases, valid artifacts must pass, mutants must fail.</p>
@@ -205,7 +209,7 @@
     <pre><span class="c"># the protocol is files; the CLI enforces the gates</span>
 pip install pyyaml jsonschema
 git clone https://github.com/WCKDai/wckd &amp;&amp; cd wckd
-make test                                    <span class="c"># 45 tests, including a full W→D5 run</span>
+make test                                    <span class="c"># 47 tests, including a full W→D5 run</span>
 
 wckd new aqm "A home air-quality monitor that alerts my phone"
 wckd next aqm                                <span class="g"># who runs next, what to hand them, what to write</span>

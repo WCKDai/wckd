@@ -61,7 +61,7 @@ Full criteria and required evidence: `workflows/gates.yaml`. KILL and WAIT are t
 
 ```bash
 pip install pyyaml jsonschema
-make test                                    # 45 tests: gates, lifecycle, run loop, MCP, HTTP, physical
+make test                                    # 47 tests: gates, lifecycle, run loop, MCP, HTTP, both realms
 ln -sf "$PWD/bin/wckd.py" ~/.local/bin/wckd  # or: python bin/wckd.py <cmd>
 
 wckd new aqm "A home air-quality monitor that alerts my phone"
@@ -126,9 +126,15 @@ fail) to prove the schemas agree.
 **No dependencies.** PyYAML is optional (the committed manifest is used instead) and jsonschema is optional
 (required-key fallback). `WCKD_NO_YAML=1` exercises the stdlib-only path; CI runs it on every push.
 
-## Physical work
+## Digital and physical obligations
 
-The same eight gates, with the physical column enforced where it can be checked (see `workflows/physical.yaml`):
+The same eight gates in both realms; each carries obligations a generic reading would miss.
+
+**Digital** (`workflows/digital.yaml`): run cost is itemised line by line (compute, storage, egress, licences,
+SaaS, support, patching), every KEEP decision carries a priced exit line, kept dependencies are watched in the
+runbook, environments are named before cutover, and the release has a rehearsed rollback.
+
+**Physical** (`workflows/physical.yaml`):
 
 - **G-K** — certification targets per market, serviceability, a hazard analysis where every hazard has a
   control, unit cost at the planned volume with MOQ and lead-time notes, certification priced as NRE.

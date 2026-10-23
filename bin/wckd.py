@@ -240,7 +240,7 @@ def physical_rule(*path, default=None):
 
 
 def realm_gate_checks(gid: str, pdir: Path, T: dict):
-    """Realm-conditional obligations: adversarial coverage at G-D3, and the physical column where it applies."""
+    """Realm-conditional obligations: adversarial coverage at G-D3, digital operations, the physical column."""
     P = []
 
     def J(n):
@@ -248,6 +248,8 @@ def realm_gate_checks(gid: str, pdir: Path, T: dict):
         return load_json(p) if p.exists() else None
 
     realm = realm_of(pdir)
+    digital = realm in ("digital", "hybrid")
+    physical = realm in ("physical", "hybrid")
 
     if gid == "G-D3":
         breaches = []
@@ -271,58 +273,86 @@ def realm_gate_checks(gid: str, pdir: Path, T: dict):
             P.append("no cost campaign is compared against cost.run_monthly")
         return P
 
-    if realm not in ("physical", "hybrid"):
-        return P
+    def kept_dependencies():
+        vd = J("verdict.json")
+        ids = set()
+        for d in (vd or {}).get("decisions", []):
+            if d.get("verdict") in ("KEEP", "BEND") and d.get("chosen_candidate"):
+                ids.add(d["chosen_candidate"])
+        return ids
 
     if gid == "G-K":
-        bp, co = J("blueprint.json"), J("cost.json")
-        if bp:
-            spec = bp.get("physical_spec") or {}
-            if not (spec.get("certification_targets") or []):
-                P.append("physical: blueprint.physical_spec.certification_targets is empty; name the markets and marks")
-            if not (spec.get("serviceability") or "").strip():
-                P.append("physical: serviceability is unstated; how is a sensor or battery replaced?")
-            need_haz = physical_rule("hazard_analysis", "min_entries", default=3)
-            haz = bp.get("hazard_analysis") or []
-            if len(haz) < need_haz:
-                P.append(f"physical: hazard_analysis has {len(haz)} entries; need >={need_haz}")
-            for h in haz:
-                if not (h.get("control") or "").strip():
-                    P.append(f"physical: hazard {h.get('id')} has no control (put it in open_risks if it has none)")
-        if co:
-            unit = co.get("unit")
-            if not unit:
-                P.append("physical: cost.unit is missing (BOM, assembly, test, packaging, shipping, warranty)")
-            else:
-                if not unit.get("total_per_unit"):
-                    P.append("physical: cost.unit.total_per_unit is zero or missing")
-                if not (unit.get("moq_notes") or "").strip():
-                    P.append("physical: cost.unit.moq_notes is empty; minimum order quantities are unpriced")
-                if not (unit.get("lead_time_notes") or "").strip():
-                    P.append("physical: cost.unit.lead_time_notes is empty")
-            if not ((co.get("build") or {}).get("certification") or []):
-                P.append("physical: build.certification is empty; certification is NRE, price it")
+        co = J("cost.json")
+        kept = kept_dependencies()
+        if digital:
+            if co:
+                run = co.get("run_monthly") or {}
+                if (run.get("total") or 0) > 0 and not (run.get("digital") or []):
+                    P.append("digital: run_monthly.total is above zero but run_monthly.digital is empty; "
+                             "itemise compute, storage, egress, licences, SaaS, support, patching")
+                exit_ = co.get("exit") or {}
+                if kept and not (exit_.get("kept_dependency_exits") or []):
+                    P.append("digital: KEEP is not free - cost.exit.kept_dependency_exits is empty for "
+                             f"{', '.join(sorted(kept))}")
+        if physical:
+            bp = J("blueprint.json")
+            if bp:
+                spec = bp.get("physical_spec") or {}
+                if not (spec.get("certification_targets") or []):
+                    P.append("physical: blueprint.physical_spec.certification_targets is empty; name the markets and marks")
+                if not (spec.get("serviceability") or "").strip():
+                    P.append("physical: serviceability is unstated; how is a sensor or battery replaced?")
+                need_haz = physical_rule("hazard_analysis", "min_entries", default=3)
+                haz = bp.get("hazard_analysis") or []
+                if len(haz) < need_haz:
+                    P.append(f"physical: hazard_analysis has {len(haz)} entries; need >={need_haz}")
+                for h in haz:
+                    if not (h.get("control") or "").strip():
+                        P.append(f"physical: hazard {h.get('id')} has no control (put it in open_risks if it has none)")
+            if co:
+                unit = co.get("unit")
+                if not unit:
+                    P.append("physical: cost.unit is missing (BOM, assembly, test, packaging, shipping, warranty)")
+                else:
+                    if not unit.get("total_per_unit"):
+                        P.append("physical: cost.unit.total_per_unit is zero or missing")
+                    if not (unit.get("moq_notes") or "").strip():
+                        P.append("physical: cost.unit.moq_notes is empty; minimum order quantities are unpriced")
+                    if not (unit.get("lead_time_notes") or "").strip():
+                        P.append("physical: cost.unit.lead_time_notes is empty")
+                if not ((co.get("build") or {}).get("certification") or []):
+                    P.append("physical: build.certification is empty; certification is NRE, price it")
 
     elif gid == "G-D4":
         rel = J("release.json")
         if rel:
-            hw = rel.get("hardware") or {}
-            if not hw:
-                P.append("physical: release.hardware is missing (pilot batch, handoff, QC, serials, recall)")
-            else:
-                min_units = physical_rule("pilot_batch", "min_units", default=T.get("pilot_batch_min", 5))
-                if int(hw.get("pilot_batch_size") or 0) < int(min_units):
-                    P.append(f"physical: pilot_batch_size is {hw.get('pilot_batch_size')}; need >={min_units}")
-                for k in ("qc_sampling_plan", "serial_tracking", "logistics"):
-                    if not (hw.get(k) or "").strip():
-                        P.append(f"physical: release.hardware.{k} is empty")
-                rr = hw.get("repair_recall_path") or {}
-                if rr.get("rehearsal_result") != "pass":
-                    P.append("physical: repair/recall path was not rehearsed to a pass on real units")
+            if digital and not (rel.get("environments") or []):
+                P.append("digital: release.environments is empty; name where this runs before cutover")
+            if physical:
+                hw = rel.get("hardware") or {}
+                if not hw:
+                    P.append("physical: release.hardware is missing (pilot batch, handoff, QC, serials, recall)")
+                else:
+                    min_units = physical_rule("pilot_batch", "min_units", default=T.get("pilot_batch_min", 5))
+                    try:
+                        batch = int(hw.get("pilot_batch_size") or 0)
+                    except (TypeError, ValueError):
+                        batch = 0
+                    if batch < int(min_units):
+                        P.append(f"physical: pilot_batch_size is {hw.get('pilot_batch_size')}; need >={min_units}")
+                    for k in ("qc_sampling_plan", "serial_tracking", "logistics"):
+                        if not (hw.get(k) or "").strip():
+                            P.append(f"physical: release.hardware.{k} is empty")
+                    rr = hw.get("repair_recall_path") or {}
+                    if rr.get("rehearsal_result") != "pass":
+                        P.append("physical: repair/recall path was not rehearsed to a pass on real units")
 
     elif gid == "G-D5":
         rb = J("runbook.json")
-        if rb:
+        kept = kept_dependencies()
+        if rb and digital and kept and not (rb.get("kept_dependencies_watched") or []):
+            P.append(f"digital: kept dependencies {', '.join(sorted(kept))} are not watched in runbook.kept_dependencies_watched")
+        if rb and physical:
             if not rb.get("spares_and_consumables"):
                 P.append("physical: runbook.spares_and_consumables is empty")
             cadence = " ".join((t.get("task") or "").lower() for t in rb.get("maintenance_cadence", []))
@@ -998,6 +1028,7 @@ def build_manifest():
     loops = yaml.safe_load((WORKFLOWS / "loops.yaml").read_text())
     camp = yaml.safe_load((WORKFLOWS / "campaigns.yaml").read_text()) if (WORKFLOWS / "campaigns.yaml").exists() else {}
     phys = yaml.safe_load((WORKFLOWS / "physical.yaml").read_text()) if (WORKFLOWS / "physical.yaml").exists() else {}
+    dig = yaml.safe_load((WORKFLOWS / "digital.yaml").read_text()) if (WORKFLOWS / "digital.yaml").exists() else {}
     common = load_json(SCHEMAS / "common.schema.json")
 
     def enum(defname):
@@ -1040,6 +1071,7 @@ def build_manifest():
         "human_veto_gates": sorted(HUMAN_GATES),
         "tolerances": dict(TOLERANCES),
         "campaigns": camp,
+        "digital": dig,
         "physical": phys,
     }
 

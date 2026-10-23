@@ -26,6 +26,9 @@
   at the same numbers (5 source classes, 3 candidates, 3 lessons, 3 failure modes, reuse ≥0.60, opex +10 %).
 - `workflows/campaigns.yaml` — minimum adversarial coverage per realm at G-D3 (digital: security, abuse, edge,
   load, chaos, cost; physical adds physical stress and supply chain). Enforced.
+- `workflows/digital.yaml` — itemised run cost, priced exits for KEEP decisions, licence obligations, SBOM and
+  update policy, backup/restore rehearsal, quotas, named on-call, data retention and export. Enforced at G-K
+  (run cost lines, kept-dependency exits), G-D4 (environments) and G-D5 (kept dependencies watched).
 - `workflows/physical.yaml` — certification matrix by market, DFM checklist, sourcing and second-source rule,
   pilot batch gate, calibration traceability, recall rehearsal, end-of-life. Enforced where machine-checkable:
   G-K (certification targets, serviceability, hazard analysis with controls, unit cost with MOQ and lead time,
@@ -41,8 +44,8 @@
 - G-D5 crashed with `KeyError: 'lessons.md'` on every project that reached Kept.
 - `wckd status | head` traced back on SIGPIPE.
 
-Tests: 45 (gate rules, a full synthetic W→D5 lifecycle, the run loop, MCP, HTTP, physical refusals, manifest
-and conformance). CI covers Python 3.10–3.12 plus a stdlib-only job.
+Tests: 47 (gate rules, a full synthetic W→D5 lifecycle, the run loop, MCP, HTTP, digital and physical
+refusals, manifest and conformance). CI covers Python 3.10–3.12 plus a stdlib-only job.
 
 ## 1.0.1 — the protocol made to pass its own gates
 

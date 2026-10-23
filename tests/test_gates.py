@@ -137,7 +137,11 @@ class TestVerdict(Base):
                          "assembly": [], "test": [], "packaging": [], "shipping": [], "warranty_reserve": [],
                          "moq_notes": "MOQ 10 on the enclosure", "lead_time_notes": "6 weeks on the sensor",
                          "total_per_unit": 61},
-                "run_monthly": {"digital": [], "physical": [], "people": [], "total": 2}}
+                "run_monthly": {"digital": [{"item": "host power", "amount": 2, "confidence_class": "budgetary"}],
+                                "physical": [], "people": [], "total": 2},
+                "exit": {"migration": [], "decommission": [], "disposal": [],
+                         "kept_dependency_exits": [{"item": "leave Home Assistant", "amount": 0, "confidence_class": "rom"}],
+                         "total": 0}}
         prospect = {"id": "p", "kill_criteria": ["no demand"]}
         plan = {"id": "pl", "milestones": [], "work_orders": [], "critical_path": [], "crews": [],
                 "premortem": {"run_at": "2026-10-23T00:00:00+00:00", "with": "breaker",
@@ -328,6 +332,56 @@ class TestPhysical(Base):
         self.assertIn("physical", joined)
         self.assertIn("supply_chain", joined)
         self.assertIn("cost campaign", joined)
+
+
+class TestDigital(Base):
+    """Digital obligations: itemised run cost, priced exits, watched kept dependencies."""
+
+    def _digital_project(self):
+        self.brief["realm"] = "digital"
+        self.write("brief.json", self.brief)
+        self.write("verdict.json", {"id": "v", "brief_id": "b", "landscape_id": "l", "overall": "PROCEED",
+                                    "overall_rationale": "r", "reuse_ratio": 0.83,
+                                    "decisions": [{"capability_id": c["id"], "verdict": "KEEP",
+                                                   "chosen_candidate": "cand-ha", "rationale": "r", "confidence": 0.8,
+                                                   "evidence": [{"kind": "url", "locator": "x", "summary": "s",
+                                                                 "captured_at": "2026-10-23T00:00:00+00:00",
+                                                                 "captured_by": "judge", "confidence": 0.8}]}
+                                                  for c in self.brief["capabilities"]],
+                                    "signoffs": [{"by": "judge", "role": "judge", "at": "2026-10-23T00:00:00+00:00",
+                                                  "decision": "approve"}],
+                                    "provenance": {"produced_by": "judge", "produced_at": "2026-10-23T00:00:00+00:00"}})
+
+    def test_run_cost_must_be_itemised_and_kept_exits_priced(self):
+        self._digital_project()
+        self.write("cost.json", {"id": "c", "within_ceiling": True,
+                                 "run_monthly": {"digital": [], "physical": [], "people": [], "total": 5},
+                                 "exit": {"migration": [], "decommission": [], "disposal": [],
+                                          "kept_dependency_exits": [], "total": 0}})
+        problems = wckd.semantic_checks("G-K", self.pdir)
+        self.assertTrue(any("run_monthly.digital is empty" in p for p in problems))
+        self.assertTrue(any("kept_dependency_exits is empty" in p for p in problems))
+
+    def test_kept_dependencies_must_be_watched_at_gd5(self):
+        self._digital_project()
+        self.write("runbook.json", {"id": "rb", "release_id": "r",
+                                    "owner": {"name": "Galahad", "kind": "person"},
+                                    "slos": [{"name": "up", "bar_dimension": "reliability", "target": "99%",
+                                              "measure": "probe", "alert": "a1"}],
+                                    "alerts": [{"id": "a1", "condition": "down", "route": "tg", "owner": "Galahad"}],
+                                    "oncall": {"rota": "weekly", "escalation": ["human"]},
+                                    "maintenance_cadence": [], "patching_policy": "monthly",
+                                    "kept_dependencies_watched": [],
+                                    "opex_budget_monthly": {"amount": 5, "currency": "USD", "confidence_class": "budgetary"},
+                                    "opex_actual": [], "drift_checks": [],
+                                    "reentry_triggers": [{"condition": "a", "action": "RE_WANT"},
+                                                         {"condition": "b", "action": "RE_CANVASS"},
+                                                         {"condition": "c", "action": "RE_JUDGE"}],
+                                    "end_of_life": {"when": "2027", "how": "delete", "tell_users": "changelog"},
+                                    "provenance": {"produced_by": "keeper", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        (self.pdir / "lessons.md").write_text("- a - *(x)*\n- b - *(y)*\n- c - *(z)*\n")
+        problems = wckd.semantic_checks("G-D5", self.pdir)
+        self.assertTrue(any("not watched in runbook.kept_dependencies_watched" in p for p in problems))
 
 
 class TestManifest(Base):
