@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plan",
+  "description": "Work breakdown, milestones, critical path, crews, pre-mortem. Output of K5.",
+  "type": "object",
+  "required": [
+    "id",
+    "blueprint_id",
+    "milestones",
+    "work_orders",
+    "critical_path",
+    "crews",
+    "premortem",
+    "schedule_confidence",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "blueprint_id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "milestones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "exit_criteria",
+          "due"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/common_id"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exit_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "due": {
+            "type": "string",
+            "description": "date or relative"
+          },
+          "work_orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_id"
+            }
+          }
+        }
+      }
+    },
+    "work_orders": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/common_id"
+      }
+    },
+    "long_lead_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item",
+          "lead_time",
+          "order_by"
+        ],
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "lead_time": {
+            "type": "string"
+          },
+          "order_by": {
+            "$ref": "#/$defs/common_date"
+          },
+          "work_order": {
+            "$ref": "#/$defs/common_id"
+          }
+        }
+      }
+    },
+    "critical_path": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_id"
+      }
+    },
+    "crews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "work_order",
+          "builder",
+          "validator",
+          "breaker"
+        ],
+        "properties": {
+          "work_order": {
+            "$ref": "#/$defs/common_id"
+          },
+          "builder": {
+            "type": "string"
+          },
+          "validator": {
+            "type": "string"
+          },
+          "breaker": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "builder, validator and breaker must be three different identities per work order"
+    },
+    "premortem": {
+      "type": "object",
+      "required": [
+        "run_at",
+        "with",
+        "failures"
+      ],
+      "properties": {
+        "run_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "with": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_role"
+          }
+        },
+        "failures": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": [
+              "story",
+              "mitigation_or_tripwire"
+            ],
+            "properties": {
+              "story": {
+                "type": "string"
+              },
+              "cites": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/common_id"
+                },
+                "description": "grave or risk ids"
+              },
+              "mitigation_or_tripwire": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "risks_carried": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_id"
+      }
+    },
+    "schedule_confidence": {
+      "$ref": "#/$defs/common_confidence"
+    },
+    "signoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/common_provenance"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_provenance": {
+      "type": "object",
+      "required": [
+        "produced_by",
+        "produced_at"
+      ],
+      "properties": {
+        "produced_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "produced_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_ref"
+          }
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

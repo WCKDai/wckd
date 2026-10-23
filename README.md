@@ -61,7 +61,7 @@ Full criteria and required evidence: `workflows/gates.yaml`. KILL and WAIT are t
 
 ```bash
 pip install pyyaml jsonschema
-make test                                    # 28 tests: gate rules + a full W→D5 run
+make test                                    # 45 tests: gates, lifecycle, run loop, MCP, HTTP, physical
 ln -sf "$PWD/bin/wckd.py" ~/.local/bin/wckd  # or: python bin/wckd.py <cmd>
 
 wckd new aqm "A home air-quality monitor that alerts my phone"
@@ -101,6 +101,43 @@ Not vibes — the rules that can be checked mechanically:
 
 What the CLI cannot check (graveyard substance, provenance hashes, message conformance) the Conductor must read.
 
+## Deploy it on any agent
+
+The rules live in files; the gates live in one CLI. Any of these transports is a full participant:
+
+| Transport | Use it for | Start |
+|---|---|---|
+| **CLI** | a shell, a person, a script | `bin/wckd.py` (stdlib only) |
+| **Handoff prompt** | any model that only reads text | `wckd handoff aqm --inline` → one block: SOUL, the role, the open gate's criteria, inputs, output path, JSON Schema |
+| **MCP** | Claude Desktop/Code, Cursor, Windsurf, any MCP client | `{"mcpServers":{"wckd":{"command":"python3","args":["/path/to/wckd/bin/wckd_mcp.py"]}}}` — 12 tools |
+| **HTTP** | a custom loop, n8n, a service | `wckd serve --port 8787 [--token X]` |
+| **Orchestrated** | "run the protocol against my agent" | `wckd run aqm --agent "claude -p"` (or `codex exec`, an API wrapper, a person) |
+
+`wckd run` takes the next step, renders the handoff, pipes it to your command with `WCKD_STEP`/`WCKD_ROLE`/
+`WCKD_GATE` in the environment, validates what comes back, records the gates it may record, and **stops at
+G-W, G-K and G-D4** for a human — it never signs for you.
+
+**The machine contract.** `machine/` is the protocol compiled to JSON by `wckd manifest`: `protocol.json`
+(phases, steps, gates, roles, vocabulary, tolerances, campaigns, physical obligations), `agents.json`, a
+self-contained JSON Schema per artifact, and `schemas.bundle.json`. Implement WCKD in any language against
+that, and run `wckd conformance` (16 language-independent cases: shipped artifacts must pass, mutants must
+fail) to prove the schemas agree.
+
+**No dependencies.** PyYAML is optional (the committed manifest is used instead) and jsonschema is optional
+(required-key fallback). `WCKD_NO_YAML=1` exercises the stdlib-only path; CI runs it on every push.
+
+## Physical work
+
+The same eight gates, with the physical column enforced where it can be checked (see `workflows/physical.yaml`):
+
+- **G-K** — certification targets per market, serviceability, a hazard analysis where every hazard has a
+  control, unit cost at the planned volume with MOQ and lead-time notes, certification priced as NRE.
+- **G-D3** — campaigns for physical stress, abuse, supply chain and cost (plus security when there is
+  firmware), on units from more than one batch, with a cost campaign compared to the ledger.
+- **G-D4** — a pilot batch of at least five, a QC sampling plan, serial tracking, and a repair/recall path
+  rehearsed to a pass on real units.
+- **G-D5** — spares and consumables, recalibration in the maintenance cadence, an end-of-life plan.
+
 ## Layout
 
 ```
@@ -124,10 +161,12 @@ wckd/
 │   └── LESSONS.md           read at the start of every Canvass
 ├── templates/project/   what a new project folder looks like
 ├── examples/air-quality-monitor/   a worked W → C → K run (reuse ratio 0.83)
-├── tests/               semantic gate tests + a full lifecycle test
+├── machine/             the protocol compiled to JSON: protocol, agents, standalone schemas, bundle
+├── tests/               gate rules, a full lifecycle, the run loop, MCP, HTTP, physical refusals
+├── CHANGELOG.md         what changed, and why
 ├── DEFECTS.md           this build audited against its own spec
 ├── projects/            your runs live here
-└── bin/wckd.py          new · next · validate · gate · close · score · status
+└── bin/                 wckd.py (CLI) · wckd_mcp.py (MCP server)
 ```
 
 ## Plugging into a runtime
@@ -142,9 +181,10 @@ An implementation is WCKD-compliant when it satisfies `PROTOCOL.md §15`. The sh
 
 ## Status
 
-Protocol v1.0, orchestrator v1.0.1. The delivered v1.0 was audited against its own spec: see `DEFECTS.md` for
-what was broken (a KILL that could not be recorded, conditions nobody enforced, a G-C that passed a one-query
-canvass, a G-D5 crash on `lessons.md`), what was fixed, and what is deliberately left to the Conductor.
+Protocol v1.0, orchestrator v1.1.0. The delivered v1.0 was audited against its own spec (see `DEFECTS.md`) and
+then made portable: a compiled JSON contract in `machine/`, a self-contained handoff prompt, an MCP server, an
+HTTP mode, an orchestrator that can drive any agent, and enforced physical obligations. `CHANGELOG.md` has the
+detail; `DEFECTS.md` has what is still left to the Conductor by design.
 
 ## License
 

@@ -79,6 +79,7 @@
       <a href="#letters">Four letters</a>
       <a href="#gates">Gates</a>
       <a href="#refuses">Refusals</a>
+      <a href="#deploy">Deploy</a>
       <a href="#roles">Roles</a>
       <a href="#start">Start</a>
       <a href="https://github.com/WCKDai/wckd">GitHub ↗</a>
@@ -161,6 +162,9 @@
       <li>an owner called “the team”</li>
       <li>a KILL or WAIT without a written reason</li>
       <li>a human-veto gate passed without a human</li>
+      <li>a physical build with no certification targets or hazard analysis</li>
+      <li>a hardware release with a two-unit pilot batch or an unrehearsed recall path</li>
+      <li>a hazard with no control</li>
     </ul>
   </section>
 
@@ -178,12 +182,30 @@
       not a promise.</p>
   </section>
 
+  <section id="deploy">
+    <h2><b>05</b> — Deploy on any agent</h2>
+    <table>
+      <thead><tr><th>Transport</th><th>For</th><th>Start</th></tr></thead>
+      <tbody>
+        <tr><td class="gate">CLI</td><td>a shell, a person, a script</td><td><code>bin/wckd.py</code> — stdlib only</td></tr>
+        <tr><td class="gate">Handoff</td><td>a model that only reads text</td><td><code>wckd handoff aqm --inline</code> — SOUL, role, gate criteria, inputs, output path, schema</td></tr>
+        <tr><td class="gate">MCP</td><td>Claude, Cursor, Windsurf, any MCP client</td><td><code>bin/wckd_mcp.py</code> — 12 tools over stdio</td></tr>
+        <tr><td class="gate">HTTP</td><td>a custom loop, n8n, a service</td><td><code>wckd serve --port 8787</code> — REST, optional bearer token</td></tr>
+        <tr><td class="gate">Orchestrated</td><td>&ldquo;run it against my agent&rdquo;</td><td><code>wckd run aqm --agent "claude -p"</code> — stops at every human gate</td></tr>
+      </tbody>
+    </table>
+    <p class="lede" style="font-size:15px;margin-top:22px"><code>machine/</code> is the protocol compiled to JSON —
+      phases, gates, roles, tolerances, campaigns, physical obligations and one self-contained schema per artifact —
+      so an implementation in any language gates at the same place. <code>wckd conformance</code> proves the schemas
+      agree: 16 cases, valid artifacts must pass, mutants must fail.</p>
+  </section>
+
   <section id="start">
-    <h2><b>05</b> — Run it</h2>
+    <h2><b>06</b> — Run it</h2>
     <pre><span class="c"># the protocol is files; the CLI enforces the gates</span>
 pip install pyyaml jsonschema
 git clone https://github.com/WCKDai/wckd &amp;&amp; cd wckd
-make test                                    <span class="c"># 28 tests, including a full W→D5 run</span>
+make test                                    <span class="c"># 45 tests, including a full W→D5 run</span>
 
 wckd new aqm "A home air-quality monitor that alerts my phone"
 wckd next aqm                                <span class="g"># who runs next, what to hand them, what to write</span>
@@ -195,7 +217,7 @@ wckd gate aqm G-K --by "you" --decision KILL --note "already solved; nothing to 
   </section>
 
   <footer>
-    <div>WCKD v1.0.1 · MIT · <a href="https://github.com/WCKDai/wckd">WCKDai/wckd</a></div>
+    <div>WCKD v1.1.0 · MIT · <a href="https://github.com/WCKDai/wckd">WCKDai/wckd</a></div>
     <div>Find it before you make it. Measure it before you claim it. Break it before they do.<br>
       Price it before you promise it. Write it down.</div>
   </footer>

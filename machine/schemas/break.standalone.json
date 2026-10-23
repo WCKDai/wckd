@@ -1,0 +1,498 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Breach report",
+  "description": "Adversarial campaigns, findings and dispositions for a work order or the integrated release. Output of D3.",
+  "type": "object",
+  "required": [
+    "id",
+    "target",
+    "breaker",
+    "independence_attestation",
+    "campaigns",
+    "findings",
+    "verdict",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "workorder",
+            "release"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/common_id"
+        }
+      }
+    },
+    "breaker": {
+      "type": "string"
+    },
+    "independence_attestation": {
+      "type": "object",
+      "required": [
+        "independent",
+        "note"
+      ],
+      "properties": {
+        "independent": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "category",
+          "ran",
+          "method",
+          "outcome"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "security",
+              "abuse",
+              "edge",
+              "load",
+              "chaos",
+              "physical",
+              "supply_chain",
+              "cost",
+              "privacy",
+              "safety"
+            ]
+          },
+          "ran": {
+            "type": "boolean"
+          },
+          "why_not": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "pushed_past_threshold": {
+            "type": "string",
+            "description": "which Bar threshold, by how much"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_evidence"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "category",
+          "repro",
+          "blast_radius",
+          "disposition",
+          "evidence"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/common_id"
+          },
+          "title": {
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/$defs/common_severity"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "security",
+              "abuse",
+              "edge",
+              "load",
+              "chaos",
+              "physical",
+              "supply_chain",
+              "cost",
+              "privacy",
+              "safety"
+            ]
+          },
+          "repro": {
+            "type": "string"
+          },
+          "blast_radius": {
+            "type": "string"
+          },
+          "recovery_observed": {
+            "type": "string"
+          },
+          "cost_delta": {
+            "$ref": "#/$defs/common_money"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "open",
+              "fixed",
+              "accepted",
+              "wontfix"
+            ]
+          },
+          "acceptance": {
+            "type": "object",
+            "required": [
+              "rationale",
+              "signoffs",
+              "expires"
+            ],
+            "properties": {
+              "rationale": {
+                "type": "string"
+              },
+              "signoffs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/common_signoff"
+                }
+              },
+              "expires": {
+                "$ref": "#/$defs/common_date"
+              }
+            }
+          },
+          "fixed_in": {
+            "type": "string"
+          },
+          "retested_at": {
+            "$ref": "#/$defs/common_timestamp"
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/common_evidence"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "fixed"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "retested_at"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "disposition": {
+                  "const": "accepted"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "acceptance"
+              ]
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "cost_compared_to_ledger": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "HARDENED",
+        "NOT_HARDENED"
+      ]
+    },
+    "signoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/common_provenance"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "locator",
+        "summary",
+        "captured_at",
+        "captured_by",
+        "confidence"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/common_evidence_kind"
+        },
+        "locator": {
+          "type": "string",
+          "description": "URL, path, serial, log id - whatever lets a stranger find it"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "captured_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "confidence": {
+          "$ref": "#/$defs/common_confidence"
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "tried",
+            "found",
+            "reasoned"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence_kind": {
+      "type": "string",
+      "enum": [
+        "url",
+        "file",
+        "log",
+        "measurement",
+        "repro",
+        "sample",
+        "interview",
+        "memory",
+        "receipt",
+        "photo"
+      ]
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_severity": {
+      "type": "string",
+      "enum": [
+        "crit",
+        "high",
+        "med",
+        "low",
+        "info"
+      ]
+    },
+    "common_money": {
+      "type": "object",
+      "required": [
+        "amount",
+        "currency",
+        "confidence_class"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "confidence_class": {
+          "$ref": "#/$defs/common_confidence_class"
+        },
+        "basis": {
+          "type": "string",
+          "description": "how the number was derived"
+        },
+        "source": {
+          "type": "string"
+        },
+        "priced_at": {
+          "$ref": "#/$defs/common_date"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_confidence_class": {
+      "type": "string",
+      "enum": [
+        "rom",
+        "budgetary",
+        "definitive"
+      ],
+      "description": "rom +-50%, budgetary +-25%, definitive +-10%"
+    },
+    "common_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_provenance": {
+      "type": "object",
+      "required": [
+        "produced_by",
+        "produced_at"
+      ],
+      "properties": {
+        "produced_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "produced_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_ref"
+          }
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

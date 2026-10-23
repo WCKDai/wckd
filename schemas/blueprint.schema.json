@@ -42,6 +42,7 @@
       }
     },
     "physical_spec": { "type": "object", "properties": { "envelope": { "type": "string" }, "power_budget": { "type": "string" }, "materials": { "type": "array", "items": { "type": "string" } }, "environment": { "type": "string" }, "certification_targets": { "type": "array", "items": { "type": "string" } }, "serviceability": { "type": "string" } } },
+    "hazard_analysis": { "type": "array", "description": "Required for physical and hybrid work: every hazard with severity, likelihood and a control. A hazard with no control belongs in open_risks.", "items": { "type": "object", "required": ["id", "hazard", "severity", "likelihood", "control"], "properties": { "id": { "$ref": "common.schema.json#/$defs/id" }, "hazard": { "type": "string" }, "severity": { "$ref": "common.schema.json#/$defs/severity" }, "likelihood": { "type": "integer", "minimum": 1, "maximum": 5 }, "control": { "type": "string" } }, "additionalProperties": false } },
     "adrs": {
       "type": "array",
       "items": {

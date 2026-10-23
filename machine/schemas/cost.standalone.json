@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cost ledger",
+  "description": "Build, run, unit, exit and not-doing costs, physical and digital, with confidence classes and horizons. Output of K3; re-estimated at every later gate.",
+  "type": "object",
+  "required": [
+    "id",
+    "blueprint_id",
+    "currency",
+    "confidence_class",
+    "build",
+    "run_monthly",
+    "exit",
+    "not_doing",
+    "keep_costs",
+    "horizons",
+    "assumptions",
+    "sensitivity",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "blueprint_id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 3
+    },
+    "confidence_class": {
+      "$ref": "#/$defs/common_confidence_class"
+    },
+    "build": {
+      "type": "object",
+      "required": [
+        "people",
+        "tools",
+        "materials",
+        "prototypes",
+        "nre",
+        "certification",
+        "total"
+      ],
+      "properties": {
+        "people": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "tools": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "materials": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "prototypes": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "nre": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "certification": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "canvass_spent": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        }
+      }
+    },
+    "run_monthly": {
+      "type": "object",
+      "required": [
+        "digital",
+        "physical",
+        "people",
+        "total"
+      ],
+      "properties": {
+        "digital": {
+          "$ref": "#/$defs/local_lines",
+          "description": "compute, storage, egress, licenses, saas, support, patching"
+        },
+        "physical": {
+          "$ref": "#/$defs/local_lines",
+          "description": "power, consumables, spares, calibration, maintenance labor, disposal"
+        },
+        "people": {
+          "$ref": "#/$defs/local_lines",
+          "description": "on-call, support, maintenance hours"
+        },
+        "total": {
+          "type": "number"
+        }
+      }
+    },
+    "unit": {
+      "type": "object",
+      "required": [
+        "volume",
+        "bom",
+        "assembly",
+        "test",
+        "packaging",
+        "shipping",
+        "warranty_reserve",
+        "total_per_unit"
+      ],
+      "properties": {
+        "volume": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bom": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "assembly": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "test": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "packaging": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "shipping": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "warranty_reserve": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "moq_notes": {
+          "type": "string"
+        },
+        "lead_time_notes": {
+          "type": "string"
+        },
+        "total_per_unit": {
+          "type": "number"
+        }
+      }
+    },
+    "exit": {
+      "type": "object",
+      "required": [
+        "migration",
+        "decommission",
+        "disposal",
+        "kept_dependency_exits",
+        "total"
+      ],
+      "properties": {
+        "migration": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "decommission": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "disposal": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "kept_dependency_exits": {
+          "$ref": "#/$defs/local_lines"
+        },
+        "total": {
+          "type": "number"
+        }
+      }
+    },
+    "not_doing": {
+      "type": "object",
+      "required": [
+        "monthly",
+        "basis"
+      ],
+      "properties": {
+        "monthly": {
+          "type": "number"
+        },
+        "basis": {
+          "type": "string"
+        }
+      }
+    },
+    "keep_costs": {
+      "$ref": "#/$defs/local_lines",
+      "description": "licenses, fees, lock-in for every KEEP decision"
+    },
+    "horizons": {
+      "type": "object",
+      "required": [
+        "m1",
+        "m12",
+        "m36"
+      ],
+      "properties": {
+        "m1": {
+          "type": "number"
+        },
+        "m12": {
+          "type": "number"
+        },
+        "m36": {
+          "type": "number"
+        }
+      }
+    },
+    "within_ceiling": {
+      "type": "boolean"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitivity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "variable",
+          "effect"
+        ],
+        "properties": {
+          "variable": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reestimates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "at_gate",
+          "at",
+          "build_total",
+          "run_monthly_total",
+          "variance_within_class"
+        ],
+        "properties": {
+          "at_gate": {
+            "type": "string"
+          },
+          "at": {
+            "$ref": "#/$defs/common_timestamp"
+          },
+          "build_total": {
+            "type": "number"
+          },
+          "run_monthly_total": {
+            "type": "number"
+          },
+          "variance_within_class": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "signoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/common_provenance"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_confidence_class": {
+      "type": "string",
+      "enum": [
+        "rom",
+        "budgetary",
+        "definitive"
+      ],
+      "description": "rom +-50%, budgetary +-25%, definitive +-10%"
+    },
+    "local_lines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/local_line"
+      }
+    },
+    "local_line": {
+      "type": "object",
+      "required": [
+        "item",
+        "amount"
+      ],
+      "properties": {
+        "item": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "confidence_class": {
+          "$ref": "#/$defs/common_confidence_class"
+        },
+        "source": {
+          "type": "string"
+        },
+        "priced_at": {
+          "$ref": "#/$defs/common_date"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_provenance": {
+      "type": "object",
+      "required": [
+        "produced_by",
+        "produced_at"
+      ],
+      "properties": {
+        "produced_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "produced_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_ref"
+          }
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

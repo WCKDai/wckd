@@ -18,7 +18,7 @@
 The CLI does no domain work. It enforces order, validates artifacts, and records decisions.
 Requires: pip install pyyaml jsonschema
 """
-import argparse, datetime, hashlib, json, os, re, shutil, sys
+import argparse, copy, datetime, hashlib, json, os, re, shutil, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,8 +26,10 @@ SCHEMAS, WORKFLOWS, PROJECTS = ROOT / "schemas", ROOT / "workflows", ROOT / "pro
 
 try:
     import yaml
-except ImportError:
-    sys.exit("wckd needs PyYAML: pip install pyyaml")
+except ImportError:      # the committed machine/*.json makes YAML optional at run time
+    yaml = None
+if os.environ.get("WCKD_NO_YAML"):   # test the no-dependency path on a machine that has PyYAML
+    yaml = None
 
 FILE_SCHEMA = {"wish.json": "wish", "brief.json": "brief", "landscape.json": "landscape", "verdict.json": "verdict",
                "blueprint.json": "blueprint", "cost.json": "cost", "prospect.json": "prospect", "plan.json": "plan",
@@ -55,11 +57,21 @@ def project_dir(slug):
     return d
 
 def gates_def():
-    return yaml.safe_load((WORKFLOWS / "gates.yaml").read_text())
+    if yaml and (WORKFLOWS / "gates.yaml").exists():
+        return yaml.safe_load((WORKFLOWS / "gates.yaml").read_text())
+    mp = machine_protocol() or {}
+    if not mp.get("gates"):
+        sys.exit("no workflows/gates.yaml and no machine/protocol.json: cannot read the gate definitions")
+    return {"order": mp["order"], "gates": mp["gates"]}
 
 def workflow_steps():
-    wf = yaml.safe_load((WORKFLOWS / "wckd.workflow.yaml").read_text())
-    return [s | {"phase": p["id"]} for p in wf["phases"] for s in p["steps"]]
+    if yaml and (WORKFLOWS / "wckd.workflow.yaml").exists():
+        phases = yaml.safe_load((WORKFLOWS / "wckd.workflow.yaml").read_text())["phases"]
+    else:
+        phases = (machine_protocol() or {}).get("phases") or []
+        if not phases:
+            sys.exit("no workflows/wckd.workflow.yaml and no machine/protocol.json: cannot read the pipeline")
+    return [s | {"phase": p["id"]} for p in phases for s in p["steps"]]
 
 # ---------------------------------------------------------------- validation
 
@@ -201,9 +213,128 @@ def open_conditions_blocking(gid: str, pdir: Path):
                 probs.append(f"open condition from {r.get('gate_id')} (due {due}, owner {c.get('owner')}): {c.get('statement')}")
     return probs
 
+def manifest_section(name):
+    return (machine_protocol() or {}).get(name) or {}
+
+
+def realm_of(pdir: Path):
+    p = pdir / "brief.json"
+    if not p.exists():
+        return "digital"
+    return load_json(p).get("realm") or "digital"
+
+
+def campaign_rules(realm):
+    camp = (manifest_section("campaigns").get("campaigns") or {})
+    hit = camp.get(realm) or camp.get("hybrid") or {}
+    return hit.get("required", [])
+
+
+def physical_rule(*path, default=None):
+    node = manifest_section("physical")
+    for k in path:
+        if not isinstance(node, dict) or k not in node:
+            return default
+        node = node[k]
+    return node
+
+
+def realm_gate_checks(gid: str, pdir: Path, T: dict):
+    """Realm-conditional obligations: adversarial coverage at G-D3, and the physical column where it applies."""
+    P = []
+
+    def J(n):
+        p = pdir / n
+        return load_json(p) if p.exists() else None
+
+    realm = realm_of(pdir)
+
+    if gid == "G-D3":
+        breaches = []
+        d = pdir / "breaches"
+        if d.exists():
+            for p in sorted(d.glob("*.json")):
+                try:
+                    breaches.append(load_json(p))
+                except Exception:
+                    pass
+        ran = set()
+        for br in breaches:
+            for c in br.get("campaigns", []):
+                if c.get("ran") or (c.get("why_not") or "").strip():
+                    ran.add(c.get("category"))
+        need = campaign_rules(realm)
+        missing = [c for c in need if c not in ran]
+        if missing:
+            P.append(f"{realm}: no adversarial campaign recorded for {', '.join(missing)} (workflows/campaigns.yaml)")
+        if breaches and not any((br.get("cost_compared_to_ledger") or "").strip() for br in breaches):
+            P.append("no cost campaign is compared against cost.run_monthly")
+        return P
+
+    if realm not in ("physical", "hybrid"):
+        return P
+
+    if gid == "G-K":
+        bp, co = J("blueprint.json"), J("cost.json")
+        if bp:
+            spec = bp.get("physical_spec") or {}
+            if not (spec.get("certification_targets") or []):
+                P.append("physical: blueprint.physical_spec.certification_targets is empty; name the markets and marks")
+            if not (spec.get("serviceability") or "").strip():
+                P.append("physical: serviceability is unstated; how is a sensor or battery replaced?")
+            need_haz = physical_rule("hazard_analysis", "min_entries", default=3)
+            haz = bp.get("hazard_analysis") or []
+            if len(haz) < need_haz:
+                P.append(f"physical: hazard_analysis has {len(haz)} entries; need >={need_haz}")
+            for h in haz:
+                if not (h.get("control") or "").strip():
+                    P.append(f"physical: hazard {h.get('id')} has no control (put it in open_risks if it has none)")
+        if co:
+            unit = co.get("unit")
+            if not unit:
+                P.append("physical: cost.unit is missing (BOM, assembly, test, packaging, shipping, warranty)")
+            else:
+                if not unit.get("total_per_unit"):
+                    P.append("physical: cost.unit.total_per_unit is zero or missing")
+                if not (unit.get("moq_notes") or "").strip():
+                    P.append("physical: cost.unit.moq_notes is empty; minimum order quantities are unpriced")
+                if not (unit.get("lead_time_notes") or "").strip():
+                    P.append("physical: cost.unit.lead_time_notes is empty")
+            if not ((co.get("build") or {}).get("certification") or []):
+                P.append("physical: build.certification is empty; certification is NRE, price it")
+
+    elif gid == "G-D4":
+        rel = J("release.json")
+        if rel:
+            hw = rel.get("hardware") or {}
+            if not hw:
+                P.append("physical: release.hardware is missing (pilot batch, handoff, QC, serials, recall)")
+            else:
+                min_units = physical_rule("pilot_batch", "min_units", default=T.get("pilot_batch_min", 5))
+                if int(hw.get("pilot_batch_size") or 0) < int(min_units):
+                    P.append(f"physical: pilot_batch_size is {hw.get('pilot_batch_size')}; need >={min_units}")
+                for k in ("qc_sampling_plan", "serial_tracking", "logistics"):
+                    if not (hw.get(k) or "").strip():
+                        P.append(f"physical: release.hardware.{k} is empty")
+                rr = hw.get("repair_recall_path") or {}
+                if rr.get("rehearsal_result") != "pass":
+                    P.append("physical: repair/recall path was not rehearsed to a pass on real units")
+
+    elif gid == "G-D5":
+        rb = J("runbook.json")
+        if rb:
+            if not rb.get("spares_and_consumables"):
+                P.append("physical: runbook.spares_and_consumables is empty")
+            cadence = " ".join((t.get("task") or "").lower() for t in rb.get("maintenance_cadence", []))
+            if "calibrat" not in cadence:
+                P.append("physical: maintenance cadence has no recalibration task")
+    return P
+
+
 def semantic_checks(gid: str, pdir: Path):
     """Cheap cross-artifact checks the schemas cannot express. Returns a list of problems."""
     P = []
+    T = tolerances()
     def J(name):
         p = pdir / name
         return load_json(p) if p.exists() else None
@@ -246,17 +377,17 @@ def semantic_checks(gid: str, pdir: Path):
                             e["notes"] += 1
                 absences = {a["capability_id"]: a for a in L.get("absence_declarations", [])}
                 coverage = {r["capability_id"]: r for r in L.get("coverage", [])}
-                fresh_days = b.get("freshness_days", 90)
+                fresh_days = b.get("freshness_days", T["freshness_days"])
                 for cap in b["capabilities"]:
                     cid, e = cap["id"], caps.get(cap["id"], {"classes": set(), "cands": set(), "tried": set(), "notes": 0})
                     if cid in absences:
-                        if len(absences[cid].get("search_log_refs") or []) < 5:
-                            P.append(f"{cid}: absence declared without 5 search-log references")
+                        if len(absences[cid].get("search_log_refs") or []) < T["min_source_classes"]:
+                            P.append(f"{cid}: absence declared without {T['min_source_classes']} search-log references")
                     else:
-                        if len(e["classes"]) < 5:
-                            P.append(f"{cid}: {len(e['classes'])}/5 source classes searched (need >=5, or a proven absence)")
-                        if len(e["cands"]) < 3:
-                            P.append(f"{cid}: {len(e['cands'])} candidates evaluated (need >=3, or a proven absence)")
+                        if len(e["classes"]) < T["min_source_classes"]:
+                            P.append(f"{cid}: {len(e['classes'])}/{T['min_source_classes']} source classes searched (need >={T['min_source_classes']}, or a proven absence)")
+                        if len(e["cands"]) < T["min_candidates"]:
+                            P.append(f"{cid}: {len(e['cands'])} candidates evaluated (need >={T['min_candidates']}, or a proven absence)")
                         if not e["tried"] and not e["notes"]:
                             P.append(f"{cid}: no candidate was tried and no trial_notes say why not")
                     row = coverage.get(cid)
@@ -303,8 +434,8 @@ def semantic_checks(gid: str, pdir: Path):
                     P.append("prospect.json has no kill_criteria; the project cannot fail on paper")
                 if pl:
                     fails = (pl.get("premortem") or {}).get("failures") or []
-                    if len(fails) < 3:
-                        P.append(f"premortem names {len(fails)} failure modes; need >=3")
+                    if len(fails) < T["min_premortem"]:
+                        P.append(f"premortem names {len(fails)} failure modes; need >={T['min_premortem']}")
                     for c in pl["crews"]:
                         if len({c["builder"], c["validator"], c["breaker"]}) < 3:
                             P.append(f"crew for {c['work_order']} violates builder != validator != breaker")
@@ -359,12 +490,13 @@ def semantic_checks(gid: str, pdir: Path):
                 if not rb.get("reentry_triggers"):
                     P.append("runbook has no re-entry triggers")
             n = len([l for l in lessons.read_text().splitlines() if l.lstrip().startswith(("-", "*", "1", "2", "3", "4", "5", "6", "7", "8", "9"))]) if lessons.exists() else 0
-            if n < 3:
-                P.append(f"lessons.md has {n} lessons; need >= 3")
+            if n < T["min_lessons"]:
+                P.append(f"lessons.md has {n} lessons; need >= {T['min_lessons']}")
             if not (pdir.parent.parent / "memory" / "LESSONS.md").exists():
                 P.append("memory/LESSONS.md is missing; lessons cannot compound")
     except (KeyError, TypeError) as e:
         P.append(f"semantic check hit a malformed artifact: {e}")
+    P += realm_gate_checks(gid, pdir, T)
     P += open_conditions_blocking(gid, pdir)
     return P
 
@@ -411,53 +543,36 @@ def cmd_status(a):
         print(f"\ncurrent gate: {cur['id'] + ' ' + cur['name'] if cur else 'none - project is Kept; the Keeper operates it'}")
 
 def cmd_next(a):
-    pdir, v, gd = project_dir(a.slug), Validators(), gates_def()
-    st = gate_state(pdir)
-    steps = workflow_steps()
-    ov = verdict_overall(pdir)
-    t = terminal_state(pdir)
-    if t:
-        s = next(x for x in steps if x["id"] == "S1")
+    pdir = project_dir(a.slug)
+    ctx = current_context(pdir)
+    if ctx["terminal"]:
+        t = ctx["terminal"]
         print(f"project ended: {t['decision']} recorded at {t['gate_id']} ({t['at']}).")
         if not (pdir / "lessons.md").exists():
-            print_step(s, a.slug, "lessons.md")
+            print_step(ctx["steps"][0], a.slug, "lessons.md")
         else:
             print("lessons.md is written. No steps remain: re-entry starts a new project (RE_WANT) "
                   "or a scoped canvass (RE_CANVASS); the reasons are in memory.")
         return
-    if ov in ("KILL", "WAIT") and st.get("G-K") not in PASSING:
-        s = next(x for x in steps if x["id"] == "S1")
+    if ctx["verdict_terminal"]:
+        ov = ctx["verdict_terminal"]
         print(f"overall verdict is {ov}. The project {'ends' if ov == 'KILL' else 'sleeps until a tripwire fires'} here.")
-        print_step(s, a.slug, "lessons.md"); return
-    cur = next((g for g in gd["gates"] if st.get(g["id"]) not in PASSING), None)
+        print_step(ctx["steps"][0], a.slug, "lessons.md"); return
+    cur = ctx["gate"]
     if not cur:
-        print("every gate is passed. Operation: the Keeper reviews SLOs weekly, records opex monthly, checks drift quarterly (workflows/wckd.workflow.yaml#operation)."); return
-    ok, problems, _ = check_requirements(cur, pdir, v)
+        print("every gate is passed. Operation: the Keeper reviews SLOs weekly, records opex monthly, "
+              "checks drift quarterly (workflows/wckd.workflow.yaml#operation)."); return
     print(f"current gate: {cur['id']} {cur['name']}   (phase {cur['phase']})")
-    if ok:
+    if ctx["ok"]:
         human = "  --human" if cur["id"] in HUMAN_GATES else ""
         print(f"\nall required artifacts present and valid. Review the criteria in workflows/gates.yaml, then:\n"
               f"  python bin/wckd.py gate {a.slug} {cur['id']} --by \"<name>\"{human}")
         if cur["id"] in HUMAN_GATES: print("  (this gate needs the human's sign-off)")
         return
     print("\nblocking:")
-    for p in problems: print(f"  - {p}")
-    # map missing/invalid artifacts to the steps that produce them
-    wanted = []
-    for p in problems:
-        base = p.split(":")[0].split(" ")[0]
-        base = base.split("/")[0] + "/" if "/" in base and not base.endswith(".json") else base
-        wanted.append(base)
-    todo, seen = [], set()
-    for s in steps:
-        if s["phase"] != cur["phase"] and not (cur["phase"] == "D" and s["phase"] == "D"): continue
-        outs = " ".join(s.get("out", []))
-        if any(w.rstrip("/") in outs for w in wanted) and s["id"] not in seen:
-            seen.add(s["id"]); todo.append(s)
-    if not todo:  # semantic problem rather than a missing artifact: point at the phase's steps
-        todo = [s for s in steps if s["phase"] == cur["phase"]]
+    for p in ctx["problems"]: print(f"  - {p}")
     print("\nrun next (in this order; parallel where marked):")
-    for s in todo:
+    for s in ctx["steps"]:
         print_step(s, a.slug, None)
 
 def print_step(s, slug, override_out):
@@ -558,6 +673,7 @@ def compute_goals(pdir: Path):
         return load_json(p) if p.exists() else None
     brief, land, verd, cost, plan, rel, runb = (J(n) for n in ("brief.json", "landscape.json", "verdict.json",
                                                                "cost.json", "plan.json", "release.json", "runbook.json"))
+    T = tolerances()
     out = []
 
     def add(gid, status, detail):
@@ -567,7 +683,8 @@ def compute_goals(pdir: Path):
     if verd and verd.get("decisions"):
         vs = [d["verdict"] for d in verd["decisions"]]
         ratio = sum(1 for v in vs if v in ("KEEP", "BEND")) / len(vs)
-        add("G1", "pass" if ratio >= 0.60 else "fail", f"reuse {ratio:.2f} (target >=0.60)")
+        add("G1", "pass" if ratio >= T["reuse_ratio_min"] else "fail",
+            f"reuse {ratio:.2f} (target >={T['reuse_ratio_min']:.2f})")
     else:
         add("G1", "unknown", "no verdict yet")
 
@@ -581,10 +698,12 @@ def compute_goals(pdir: Path):
         for c in land.get("candidates", []):
             for f in c.get("fit", []):
                 cands.setdefault(f["capability_id"], set()).add(c["id"])
-        thin = [c for c in caps if c not in absences and (len(classes.get(c, ())) < 5 or len(cands.get(c, ())) < 3)]
+        thin = [c for c in caps if c not in absences
+                and (len(classes.get(c, ())) < T["min_source_classes"] or len(cands.get(c, ())) < T["min_candidates"])]
         lo_c = min((len(classes.get(c, ())) for c in caps), default=0)
         lo_n = min((len(cands.get(c, ())) for c in caps), default=0)
-        add("G2", "pass" if not thin else "fail", f"min {lo_c} source classes / {lo_n} candidates per capability")
+        add("G2", "pass" if not thin else "fail",
+            f"min {lo_c} source classes / {lo_n} candidates per capability (target {T['min_source_classes']}/{T['min_candidates']})")
     else:
         add("G2", "unknown", "no landscape yet")
 
@@ -658,7 +777,7 @@ def compute_goals(pdir: Path):
     lessons = pdir / "lessons.md"
     if lessons.exists():
         n = count_lessons(lessons)
-        add("G9", "pass" if n >= 3 else "fail", f"{n} lessons written (target >=3)")
+        add("G9", "pass" if n >= T["min_lessons"] else "fail", f"{n} lessons written (target >={T['min_lessons']})")
     else:
         add("G9", "unknown", "no lessons.md yet")
 
@@ -744,6 +863,694 @@ def cmd_score(a):
     if a.strict and fails:
         sys.exit(1)
 
+# ---------------------------------------------------------------- manifest / portability
+
+MACHINE = ROOT / "machine"
+VERSION = "1.1.0"
+TOLERANCES = {"min_source_classes": 5, "min_candidates": 3, "min_lessons": 3, "min_premortem": 3,
+              "reuse_ratio_min": 0.60, "freshness_days": 90, "opex_tripwire_pct": 10,
+              "min_tried_per_capability": 1, "pilot_batch_min": 5}
+
+_MACHINE_CACHE = {}
+
+
+def machine_protocol():
+    """The compiled protocol manifest. Generated by `wckd manifest`, consumed by any runtime."""
+    if "p" not in _MACHINE_CACHE:
+        p = MACHINE / "protocol.json"
+        _MACHINE_CACHE["p"] = load_json(p) if p.exists() else None
+    return _MACHINE_CACHE["p"]
+
+
+def tolerances():
+    """Numbers the protocol binds itself to, so every implementation gates at the same place."""
+    t = dict(TOLERANCES)
+    mp = machine_protocol() or {}
+    t.update(mp.get("tolerances") or {})
+    return t
+
+
+def frontmatter(p: Path):
+    """Parse an agent file: `---` frontmatter + body. Uses PyYAML when present, a small fallback otherwise."""
+    text = p.read_text()
+    if not text.startswith("---"):
+        return {}, text
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return {}, text
+    raw, body = parts[1], parts[2]
+    if yaml:
+        meta = yaml.safe_load(raw) or {}
+    else:
+        meta = {}
+        for line in raw.splitlines():
+            if not line.strip() or line.lstrip().startswith("#") or ":" not in line:
+                continue
+            k, v = line.split(":", 1)
+            meta[k.strip()] = _mini_scalar(v)
+    return meta, body.lstrip("\n")
+
+
+def _mini_scalar(v):
+    v = v.strip()
+    if v.startswith("[") and v.endswith("]"):
+        items, cur, q = [], "", None
+        for ch in v[1:-1]:
+            if q:
+                if ch == q:
+                    q = None
+                else:
+                    cur += ch
+            elif ch in "\"'":
+                q = ch
+            elif ch == ",":
+                items.append(cur.strip()); cur = ""
+            else:
+                cur += ch
+        if cur.strip():
+            items.append(cur.strip())
+        return [i for i in items if i]
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+        return v[1:-1]
+    return v
+
+
+def _roles_manifest():
+    roles = []
+    for p in sorted((ROOT / "agents").glob("*.md")):
+        meta, body = frontmatter(p)
+        roles.append({
+            "id": meta.get("name", p.stem), "phase": meta.get("phase"), "description": meta.get("description"),
+            "consumes": meta.get("consumes", []), "produces": meta.get("produces", []),
+            "skills": meta.get("skills", []), "tools": meta.get("tools", []),
+            "may_not": meta.get("may_not", []), "hands_off_to": meta.get("hands_off_to"),
+            "prompt_file": f"agents/{p.name}", "prompt": body.strip(),
+        })
+    return roles
+
+
+def _rewrite_refs(node, common_defs, local_defs, out_defs, scope="local"):
+    """Inline external refs so one artifact validates from one file, in any language."""
+    if isinstance(node, dict):
+        for k, v in list(node.items()):
+            if k == "$ref" and isinstance(v, str):
+                if v.startswith("common.schema.json#/$defs/"):
+                    name = v.rsplit("/", 1)[-1]; key = "common_" + name
+                    node[k] = "#/$defs/" + key
+                    if key not in out_defs:
+                        out_defs[key] = {}
+                        out_defs[key].update(_rewrite_refs(copy.deepcopy(common_defs[name]), common_defs, local_defs, out_defs, "common"))
+                elif v.startswith("#/$defs/"):
+                    name = v.rsplit("/", 1)[-1]
+                    # inside a copied common definition, a bare local ref still means a common definition
+                    key = ("common_" if scope == "common" else "local_") + name
+                    node[k] = "#/$defs/" + key
+                    if key not in out_defs:
+                        out_defs[key] = {}
+                        src = common_defs[name] if scope == "common" else local_defs[name]
+                        out_defs[key].update(_rewrite_refs(copy.deepcopy(src), common_defs, local_defs, out_defs, scope))
+            else:
+                _rewrite_refs(v, common_defs, local_defs, out_defs, scope)
+    elif isinstance(node, list):
+        for i, x in enumerate(node):
+            _rewrite_refs(x, common_defs, local_defs, out_defs, scope)
+    return node
+
+
+def _standalone(schema, commons):
+    out = copy.deepcopy(schema)
+    out.pop("$id", None)
+    local_defs = out.pop("$defs", {}) or {}
+    out_defs = {}
+    out = _rewrite_refs(out, commons, local_defs, out_defs)
+    if out_defs:
+        out["$defs"] = out_defs
+    return out
+
+
+def build_manifest():
+    """Return {relative path: file text} for every machine-readable protocol file."""
+    if yaml is None:
+        sys.exit("regenerating the manifest needs PyYAML: pip install pyyaml "
+                 "(the committed machine/*.json works without it)")
+    wf = yaml.safe_load((WORKFLOWS / "wckd.workflow.yaml").read_text())
+    gd = yaml.safe_load((WORKFLOWS / "gates.yaml").read_text())
+    loops = yaml.safe_load((WORKFLOWS / "loops.yaml").read_text())
+    camp = yaml.safe_load((WORKFLOWS / "campaigns.yaml").read_text()) if (WORKFLOWS / "campaigns.yaml").exists() else {}
+    phys = yaml.safe_load((WORKFLOWS / "physical.yaml").read_text()) if (WORKFLOWS / "physical.yaml").exists() else {}
+    common = load_json(SCHEMAS / "common.schema.json")
+
+    def enum(defname):
+        return common["$defs"][defname].get("enum", [])
+
+    phases = []
+    for ph in wf["phases"]:
+        phases.append({"id": ph["id"], "name": ph["name"], "question": ph.get("question"),
+                       "entry": ph.get("entry"), "time_box": ph.get("time_box"), "gate": ph.get("gate"),
+                       "steps": [{k: v for k, v in s.items() if k in
+                                  ("id", "name", "agent", "skills", "in", "out", "notes", "parallel_with",
+                                   "after", "with", "per", "independence", "gate", "loop", "on_overall_verdict")}
+                                 for s in ph["steps"]]})
+
+    protocol = {
+        "protocol": wf.get("protocol", "WCKD"),
+        "protocol_version": wf.get("version"),
+        "tool_version": VERSION,
+        "pronounced": wf.get("pronounced", "wicked"),
+        "prime_directive": (wf.get("prime_directive") or "").strip(),
+        "phases": phases,
+        "order": gd["order"],
+        "gates": [{k: v for k, v in g.items() if k in
+                   ("id", "name", "phase", "requires", "requires_if_proceed", "criteria", "signoff",
+                    "human_signoff", "on_fail")} for g in gd["gates"]],
+        "loops": loops,
+        "roles": _roles_manifest(),
+        "vocab": {
+            "verdicts": ["KEEP", "BEND", "BUILD", "WAIT", "KILL"],
+            "overall": ["PROCEED", "WAIT", "KILL"],
+            "decisions": ["PASS", "FAIL", "PASS_WITH_CONDITIONS", "KILL", "WAIT"],
+            "terminal_decisions": ["KILL", "WAIT"],
+            "bar_dimensions": enum("bar_dimension"), "source_classes": enum("source_class"),
+            "evidence_kinds": enum("evidence_kind"), "severities": enum("severity"),
+            "realms": enum("realm"), "priorities": enum("priority"), "roles": enum("role"),
+            "confidence_classes": {k: v for k, v in
+                                   (("rom", "+-50%"), ("budgetary", "+-25%"), ("definitive", "+-10%"))},
+        },
+        "artifacts": {**{f: s for f, s in FILE_SCHEMA.items()}, **{d: s for d, s in DIR_SCHEMA.items()}},
+        "human_veto_gates": sorted(HUMAN_GATES),
+        "tolerances": dict(TOLERANCES),
+        "campaigns": camp,
+        "physical": phys,
+    }
+
+    files = {"machine/protocol.json": json.dumps(protocol, indent=2) + "\n"}
+
+    agent_manifest = {"generated_from": "agents/*.md", "roles": protocol["roles"]}
+    files["machine/agents.json"] = json.dumps(agent_manifest, indent=2) + "\n"
+
+    # one self-contained schema per artifact: external refs inlined, no registry needed
+    standalones = {}
+    for p in sorted(SCHEMAS.glob("*.schema.json")):
+        name = p.stem.replace(".schema", "")
+        if name == "common":
+            continue
+        standalones[name] = _standalone(load_json(p), common["$defs"])
+        files[f"machine/schemas/{name}.standalone.json"] = json.dumps(standalones[name], indent=2) + "\n"
+
+    # a single bundle for validators that want one file
+    bundle = {"$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$id": "https://wckd.protocol/machine/schemas.bundle.json",
+              "title": "WCKD artifact schemas, self-contained",
+              "artifacts": standalones}
+    files["machine/schemas.bundle.json"] = json.dumps(bundle, indent=2) + "\n"
+    return files
+
+
+def cmd_manifest(a):
+    files = build_manifest()
+    if a.check:
+        drift = []
+        for rel, content in files.items():
+            p = ROOT / rel
+            if not p.exists() or p.read_text() != content:
+                drift.append(rel)
+        if drift:
+            print("machine/ is stale; run: wckd manifest\n  " + "\n  ".join(drift))
+            sys.exit(1)
+        print(f"machine/ up to date ({len(files)} files)")
+        return
+    for rel, content in files.items():
+        p = ROOT / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content)
+        print("wrote", rel)
+
+# ---------------------------------------------------------------- handoff (any agent, any runtime)
+
+def todo_for(cur, problems, steps):
+    """Map gate problems back to the steps that produce the missing or invalid artifacts."""
+    wanted = []
+    for p in problems:
+        base = p.split(":")[0].split(" ")[0]
+        base = base.split("/")[0] + "/" if "/" in base and not base.endswith(".json") else base
+        wanted.append(base)
+    todo, seen = [], set()
+    for s in steps:
+        if s["phase"] != cur["phase"] and not (cur["phase"] == "D" and s["phase"] == "D"):
+            continue
+        outs = " ".join(s.get("out", []))
+        if any(w.rstrip("/") in outs for w in wanted) and s["id"] not in seen:
+            seen.add(s["id"]); todo.append(s)
+    if not todo:
+        todo = [s for s in steps if s["phase"] == cur["phase"]]
+    return todo
+
+
+def current_context(pdir: Path):
+    """What to do next: the open gate, its problems, and the steps that close them."""
+    gd, st, steps = gates_def(), gate_state(pdir), workflow_steps()
+    t = terminal_state(pdir)
+    s1 = [s for s in steps if s["id"] == "S1"]
+    if t:
+        return {"gate": None, "ok": False, "problems": [], "steps": s1, "terminal": t, "verdict_terminal": None}
+    ov = verdict_overall(pdir)
+    if ov in ("KILL", "WAIT") and st.get("G-K") not in PASSING:
+        return {"gate": None, "ok": False, "problems": [], "steps": s1, "terminal": None, "verdict_terminal": ov}
+    cur = next((g for g in gd["gates"] if st.get(g["id"]) not in PASSING), None)
+    if not cur:
+        return {"gate": None, "ok": True, "problems": [], "steps": [], "terminal": None, "verdict_terminal": None}
+    ok, problems, _ = check_requirements(cur, pdir, Validators())
+    return {"gate": cur, "ok": ok, "problems": problems,
+            "steps": [] if ok else todo_for(cur, problems, steps),
+            "terminal": None, "verdict_terminal": None}
+
+
+def _artifact_schema_name(out: str):
+    out = out.replace("#", "")
+    if out in FILE_SCHEMA:
+        return FILE_SCHEMA[out]
+    head = out.split("/")[0] + "/"
+    if head in DIR_SCHEMA:
+        return DIR_SCHEMA[head]
+    return None
+
+
+def gate_for_step(step):
+    gd = gates_def()
+    if step.get("gate"):
+        return next((g for g in gd["gates"] if g["id"] == step["gate"]), None)
+    return next((g for g in gd["gates"] if g["phase"] == step["phase"]), None)
+
+
+def _role_by_id(rid):
+    for r in (machine_protocol() or {}).get("roles", []):
+        if r["id"] == rid:
+            return r
+    p = ROOT / "agents" / f"{rid}.md"
+    if p.exists():
+        meta, body = frontmatter(p)
+        return {"id": rid, "description": meta.get("description"), "prompt": body.strip(),
+                "skills": meta.get("skills", []), "tools": meta.get("tools", []),
+                "may_not": meta.get("may_not", []), "produces": meta.get("produces", []),
+                "consumes": meta.get("consumes", [])}
+    return None
+
+
+def build_handoff(pdir: Path, slug: str, step: dict, gate: dict, inline: bool):
+    role = _role_by_id(step["agent"]) or {"id": step["agent"], "prompt": "", "skills": [], "tools": [], "may_not": []}
+    outs = [o for o in step.get("out", []) if not o.startswith("the deliverable")]
+    primary = outs[0] if outs else ""
+    schema_name = _artifact_schema_name(primary)
+    schema = None
+    if schema_name:
+        sp = MACHINE / "schemas" / f"{schema_name}.standalone.json"
+        schema = load_json(sp) if sp.exists() else load_json(SCHEMAS / f"{schema_name}.schema.json")
+
+    soul = (ROOT / "SOUL.md").read_text()
+    gate_lines = ""
+    if gate:
+        gate_lines = (f"Open gate: {gate['id']} {gate['name']} (phase {gate['phase']}).\n"
+                      "It passes only when all of these are true:\n" +
+                      "".join(f"  - {c}\n" for c in gate.get("criteria", [])) +
+                      f"Human sign-off required: {'yes' if gate.get('human_signoff') else 'no'}.\n")
+
+    inputs = []
+    for rel in step.get("in", []):
+        rel = rel.replace("../../", "")
+        p = (pdir / rel.split("#")[0]) if not rel.startswith("memory/") else (ROOT / rel.split("#")[0])
+        if not p.exists():
+            p = ROOT / rel.split("#")[0]
+        item = {"path": rel, "exists": p.exists()}
+        if p.exists() and inline and p.stat().st_size < 400_000:
+            item["content"] = p.read_text()
+        inputs.append(item)
+
+    system = "\n\n".join([
+        "# WCKD — who you are",
+        soul,
+        f"# Your role: {role['id']}",
+        role.get("description") or "",
+        role.get("prompt") or "",
+        "## You may not", "\n".join(f"- {m}" for m in (role.get("may_not") or [])) or "- (nothing listed)",
+        "## Skills you own", ", ".join(role.get("skills") or []) or "(none listed)",
+    ])
+
+    user = "\n".join([
+        f"# Step {step['id']} {step['name']} — project {slug}",
+        gate_lines,
+        f"Write exactly this artifact: {', '.join(outs) or '(the deliverable)'}",
+        f"Output path: projects/{slug}/{primary}" if primary else "",
+        f"Schema: machine/schemas/{schema_name}.standalone.json" if schema_name else "",
+        "## Inputs",
+        *[f"- {i['path']} ({'present' if i['exists'] else 'MISSING'})" for i in inputs],
+        "\n## Rules for this turn",
+        "1. Stay inside the role. Do not do another role's job, even if it looks quick.",
+        "2. Write the artifact as JSON that validates against the schema. No prose around it.",
+        "3. Every claim that crosses a boundary carries evidence {kind, locator, summary, captured_at, captured_by, confidence}.",
+        "4. State what you did not check. Silence about scope is a lie by omission.",
+        "5. Do not mark anything proven, hardened or shipped that you did not produce.",
+        step.get("notes") or "",
+        "## Schema (JSON Schema 2020-12)",
+        "```json", json.dumps(schema, indent=2) if schema else "{}", "```",
+    ]).strip()
+
+    md = (f"# WCKD handoff — {slug} — step {step['id']} {step['name']}\n\n"
+          f"Role: **{step['agent']}**  ·  phase {step['phase']}  ·  gate {gate['id'] if gate else '—'}\n\n"
+          f"Give the block below to any model or agent as its system prompt, then the second block as the task.\n\n"
+          f"## System\n\n{system}\n\n## Task\n\n{user}\n")
+    return {"project": slug, "step": step["id"], "name": step["name"], "role": step["agent"],
+            "phase": step["phase"], "gate": gate["id"] if gate else None,
+            "output": f"projects/{slug}/{primary}" if primary else None,
+            "schema": f"machine/schemas/{schema_name}.standalone.json" if schema_name else None,
+            "system": system, "user": user, "markdown": md, "inputs": inputs}
+
+
+def cmd_handoff(a):
+    pdir = project_dir(a.slug)
+    ctx = current_context(pdir)
+    if a.step:
+        steps = workflow_steps()
+        hit = [s for s in steps if s["id"] == a.step]
+        if not hit:
+            sys.exit(f"unknown step {a.step}; steps: {', '.join(s['id'] for s in steps)}")
+        step = hit[0]
+        gate = gate_for_step(step) or {}
+        steps_to_emit = [step]
+    else:
+        if ctx["terminal"]:
+            sys.exit(f"project ended ({ctx['terminal']['decision']} at {ctx['terminal']['gate_id']}): nothing to hand off")
+        if not ctx["gate"]:
+            sys.exit("every gate is passed: nothing to hand off; the Keeper operates it now")
+        steps_to_emit, gate = ctx["steps"], ctx["gate"]
+    if a.role:
+        steps_to_emit = [s for s in steps_to_emit if s["agent"] == a.role]
+        if not steps_to_emit:
+            sys.exit(f"role {a.role} has no open step in this gate; open steps: "
+                     f"{', '.join(s['agent'] for s in ctx['steps'])}")
+
+    out_chunks = []
+    for step in steps_to_emit:
+        h = build_handoff(pdir, a.slug, step, gate, a.inline)
+        out_chunks.append(json.dumps(h, indent=2) if a.format == "json" else h["markdown"])
+    text = "\n\n<!-- next step -->\n\n".join(out_chunks)
+    if a.out:
+        p = Path(a.out) if a.out.startswith("/") else pdir / a.out
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+        print(f"wrote {p}  ({len(text)} chars, {len(steps_to_emit)} step(s))")
+    else:
+        print(text)
+
+# ---------------------------------------------------------------- transports: http + run + conformance
+
+def capture(fn, ns):
+    """Run a CLI command and return what it printed (used by the HTTP and MCP transports)."""
+    import contextlib, io as _io
+    buf = _io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            fn(ns)
+    except SystemExit as e:
+        if e.code not in (0, None):
+            raise RuntimeError(buf.getvalue().strip() or f"exit {e.code}")
+        return buf.getvalue().strip()
+    return buf.getvalue().strip()
+
+
+def api_projects():
+    out = []
+    for d in sorted(PROJECTS.glob("*/")):
+        if not (d / "wish.json").exists():
+            continue
+        try:
+            wish = load_json(d / "wish.json").get("text", "")
+        except Exception:
+            wish = ""
+        st, t = gate_state(d), terminal_state(d)
+        out.append({"slug": d.name, "wish": wish, "gates": st, "state": (t or {}).get("decision", "open"),
+                    "current_gate": next((g for g in gates_def()["order"] if st.get(g) not in PASSING), None)})
+    return out
+
+
+def api_write_artifact(slug, rel, content):
+    pdir = (PROJECTS / slug).resolve()
+    target = (pdir / rel).resolve()
+    if pdir not in target.parents:
+        raise RuntimeError(f"path escapes the project: {rel}")
+    text = content if isinstance(content, str) else json.dumps(content, indent=2)
+    if target.suffix == ".json":
+        data = json.loads(text)
+        name = FILE_SCHEMA.get(rel) or DIR_SCHEMA.get(rel.split("/")[0] + "/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2) + "\n")
+        if name:
+            ok, err = Validators().check(tmp, name)
+            if not ok:
+                tmp.unlink()
+                raise RuntimeError(f"{rel} does not validate against {name}: {err}")
+        tmp.replace(target)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+    return target
+
+
+def cmd_serve(a):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import urlparse, parse_qs
+
+    class H(BaseHTTPRequestHandler):
+        server_version = f"wckd/{VERSION}"
+
+        def _json(self, code, obj):
+            body = json.dumps(obj, indent=2).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _authed(self):
+            if not a.token:
+                return True
+            ok = self.headers.get("Authorization") == f"Bearer {a.token}"
+            if not ok:
+                self._json(401, {"error": "unauthorized"})
+            return ok
+
+        def _body(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            if not n:
+                return {}
+            return json.loads(self.rfile.read(n).decode() or "{}")
+
+        def do_GET(self):
+            if not self._authed():
+                return
+            u = urlparse(self.path)
+            q = parse_qs(u.query)
+            parts = [p for p in u.path.split("/") if p]
+            try:
+                if parts == ["health"]:
+                    return self._json(200, {"ok": True, "protocol": "WCKD", "tool_version": VERSION})
+                if parts == ["protocol"]:
+                    return self._json(200, machine_protocol() or {})
+                if parts == ["projects"]:
+                    return self._json(200, api_projects())
+                if len(parts) >= 2 and parts[0] == "projects":
+                    slug = parts[1]
+                    pdir = PROJECTS / slug
+                    if not pdir.exists():
+                        return self._json(404, {"error": f"no project {slug}"})
+                    if len(parts) == 2:
+                        return self._json(200, {"slug": slug, "status": capture(cmd_status, argparse.Namespace(slug=slug)),
+                                                "gates": gate_state(pdir)})
+                    if parts[2] == "next":
+                        return self._json(200, {"slug": slug, "next": capture(cmd_next, argparse.Namespace(slug=slug))})
+                    if parts[2] == "score":
+                        return self._json(200, {"slug": slug, "score": capture(cmd_score, argparse.Namespace(
+                            slug=slug, ledger=False, by=None, strict=False))})
+                    if parts[2] == "handoff":
+                        fmt = (q.get("format") or ["md"])[0]
+                        text = capture(cmd_handoff, argparse.Namespace(
+                            slug=slug, step=(q.get("step") or [None])[0], role=(q.get("role") or [None])[0],
+                            inline=bool(q.get("inline")), out=None, format=fmt))
+                        if fmt == "json":
+                            return self._json(200, json.loads(text))
+                        return self._json(200, {"markdown": text})
+                    if parts[2] == "artifacts":
+                        rel = "/".join(parts[3:])
+                        p = (pdir / rel).resolve()
+                        if (pdir.resolve() not in p.parents) or not p.exists():
+                            return self._json(404, {"error": f"no artifact {rel}"})
+                        if p.suffix == ".json":
+                            return self._json(200, load_json(p))
+                        return self._json(200, {"text": p.read_text()})
+                return self._json(404, {"error": "unknown route"})
+            except Exception as e:
+                return self._json(400, {"error": str(e)})
+
+        def do_POST(self):
+            if not self._authed():
+                return
+            u = urlparse(self.path)
+            parts = [p for p in u.path.split("/") if p]
+            try:
+                body = self._body()
+                if parts == ["projects"]:
+                    out = capture(cmd_new, argparse.Namespace(slug=body["slug"], wish=body["wish"],
+                                                              by=body.get("by", "api")))
+                    return self._json(201, {"created": body["slug"], "next": out})
+                if len(parts) >= 4 and parts[0] == "projects" and parts[2] == "artifacts":
+                    rel = "/".join(parts[3:])
+                    p = api_write_artifact(parts[1], rel, body.get("content"))
+                    return self._json(200, {"wrote": rel, "bytes": p.stat().st_size})
+                if len(parts) >= 4 and parts[0] == "projects" and parts[2] == "gates":
+                    gate = parts[3]
+                    out = capture(cmd_gate, argparse.Namespace(
+                        slug=parts[1], gate=gate, by=body.get("by", "api"),
+                        human=bool(body.get("human")), decision=body.get("decision", "PASS"),
+                        condition=body.get("conditions"), note=body.get("note")))
+                    return self._json(200, {"gate": gate, "output": out})
+                return self._json(404, {"error": "unknown route"})
+            except KeyError as e:
+                return self._json(400, {"error": f"missing field {e}"})
+            except Exception as e:
+                return self._json(400, {"error": str(e)})
+
+        def log_message(self, *args):
+            if not a.quiet:
+                super().log_message(*args)
+
+    srv = ThreadingHTTPServer((a.bind, a.port), H)
+    print(f"wckd {VERSION} serving {ROOT} on http://{a.bind}:{a.port}"
+          f"{' (token required)' if a.token else ''}\n"
+          "GET /health /protocol /projects /projects/<slug>/{next,score,handoff,artifacts/*}\n"
+          "POST /projects /projects/<slug>/artifacts/<path> /projects/<slug>/gates/<gate>")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+
+
+def _artifact_snapshot(pdir: Path):
+    h = hashlib.sha256()
+    for p in sorted(pdir.rglob("*")):
+        if p.is_file() and ".turns" not in p.parts:
+            h.update(str(p.relative_to(pdir)).encode())
+            h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def cmd_run(a):
+    """Drive the protocol against any agent command: prompt in on stdin, artifact written by the agent."""
+    pdir = project_dir(a.slug)
+    turns_dir = pdir / ".turns"
+    turns_dir.mkdir(exist_ok=True)
+    if not a.agent:
+        sys.exit("--agent is required: the command that plays a role (it reads the prompt on stdin). "
+                 "Use --dry-run to see the prompts instead.")
+    stale = 0
+    for turn in range(1, a.max_turns + 1):
+        ctx = current_context(pdir)
+        if ctx["terminal"]:
+            print(f"[run] project ended: {ctx['terminal']['decision']} at {ctx['terminal']['gate_id']}"); return
+        if not ctx["gate"]:
+            print("[run] every gate is passed; the Keeper operates it now."); return
+        gate = ctx["gate"]
+        if ctx["ok"]:
+            if gate["id"] in HUMAN_GATES:
+                print(f"[run] {gate['id']} {gate['name']} is ready and needs a human. Stop.\n"
+                      f"      wckd gate {a.slug} {gate['id']} --by \"<your name>\" --human")
+                return
+            out = capture(cmd_gate, argparse.Namespace(slug=a.slug, gate=gate["id"], by=a.by, human=False,
+                                                       decision="PASS", condition=None, note="recorded by wckd run"))
+            print(f"[run] {gate['id']} {gate['name']} recorded automatically")
+            continue
+        if not ctx["steps"]:
+            print(f"[run] {gate['id']} is blocked but no step claims the missing artifacts:\n  " +
+                  "\n  ".join(ctx["problems"])); return
+        step = ctx["steps"][0]
+        h = build_handoff(pdir, a.slug, step, gate, inline=True)
+        pf = turns_dir / f"{turn:02d}-{step['id']}-{step['agent']}.md"
+        pf.write_text(h["markdown"])
+        print(f"[run] turn {turn}: step {step['id']} {step['name']} as {step['agent']} -> {pf}")
+        before = _artifact_snapshot(pdir)
+        env = dict(os.environ, WCKD_ROOT=str(ROOT), WCKD_SLUG=a.slug, WCKD_STEP=step["id"],
+                   WCKD_ROLE=step["agent"], WCKD_GATE=gate["id"], WCKD_PROMPT=str(pf))
+        import subprocess
+        r = subprocess.run(f"cd {_shq(str(pdir))} && {a.agent} < {_shq(str(pf))}", shell=True, env=env).returncode
+        if r != 0:
+            print(f"[run] agent exited {r}; stopping. Read the agent's output above, fix the role prompt, rerun.")
+            return
+        if _artifact_snapshot(pdir) == before:
+            stale += 1
+            print(f"[run] no artifact changed this turn ({stale}/{a.max_stale})")
+            if stale >= a.max_stale:
+                print("[run] stopping: the agent is not producing artifacts. Check the handoff prompt and the schema.")
+                return
+        else:
+            stale = 0
+    print(f"[run] stopped after {a.max_turns} turns; run again to continue")
+
+
+def _shq(s):
+    return "'" + str(s).replace("'", "'\\''") + "'"
+
+
+def cmd_conformance(a):
+    """Language-independent conformance: valid artifacts must pass, mutants must fail, standalone schemas only."""
+    from jsonschema import Draft202012Validator
+    cases, bad = [], 0
+    examples = {"wish": "examples/air-quality-monitor/wish.json",
+                "brief": "examples/air-quality-monitor/brief.json",
+                "landscape": "examples/air-quality-monitor/landscape.json",
+                "verdict": "examples/air-quality-monitor/verdict.json"}
+    for name, path in examples.items():
+        sp = MACHINE / "schemas" / f"{name}.standalone.json"
+        schema = load_json(sp) if sp.exists() else load_json(SCHEMAS / f"{name}.schema.json")
+        v = Draft202012Validator(schema)
+        data = load_json(ROOT / path)
+        errs = list(v.iter_errors(data))
+        cases.append((f"{name}: shipped example", not errs, errs[0].message[:100] if errs else ""))
+        for mutant_name, mutate in _mutants(name, data):
+            try:
+                m = mutate(json.loads(json.dumps(data)))
+            except Exception:
+                continue
+            errs = list(v.iter_errors(m))
+            cases.append((f"{name}: {mutant_name} must fail", bool(errs), "accepted an invalid artifact"))
+    for name, ok, detail in cases:
+        bad += not ok
+        print(f"  {'ok ' if ok else 'FAIL'}  {name}" + (f"  -> {detail}" if (detail and not ok) else ""))
+    print(f"\n{len(cases) - bad}/{len(cases)} conformance cases pass"
+          + ("" if not bad else f" — {bad} failing"))
+    return 1 if bad else 0
+
+
+def _mutants(name, data):
+    """Cheap structural mutants: every schema must reject them."""
+    def drop_required():
+        def f(d):
+            key = json.loads((SCHEMAS / f"{name}.schema.json").read_text())["required"][0]
+            d.pop(key, None)
+            return d
+        return ("missing required key", f)
+
+    def bad_type():
+        def f(d):
+            for k, v in d.items():
+                if isinstance(v, str):
+                    d[k] = 12345
+                    break
+            return d
+        return ("wrong type", f)
+
+    yield drop_required()
+    yield bad_type()
+    yield ("extra property", lambda d: {**d, "__not_a_wckd_field": True})
+
 # ---------------------------------------------------------------- main
 
 def main():
@@ -759,6 +1566,17 @@ def main():
     p.add_argument("--by", required=True); p.add_argument("--note"); p.set_defaults(fn=cmd_close)
     p = sp.add_parser("score"); p.add_argument("slug"); p.add_argument("--ledger", action="store_true")
     p.add_argument("--by"); p.add_argument("--strict", action="store_true"); p.set_defaults(fn=cmd_score)
+    p = sp.add_parser("handoff"); p.add_argument("slug"); p.add_argument("--step"); p.add_argument("--role")
+    p.add_argument("--inline", action="store_true"); p.add_argument("--out"); p.add_argument("--format", default="md", choices=["md", "json"])
+    p.set_defaults(fn=cmd_handoff)
+    p = sp.add_parser("manifest"); p.add_argument("--check", action="store_true"); p.set_defaults(fn=cmd_manifest)
+    p = sp.add_parser("serve"); p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--bind", default="127.0.0.1"); p.add_argument("--token"); p.add_argument("--quiet", action="store_true")
+    p.set_defaults(fn=cmd_serve)
+    p = sp.add_parser("run"); p.add_argument("slug"); p.add_argument("--agent")
+    p.add_argument("--by", default="wckd-run"); p.add_argument("--max-turns", type=int, default=12)
+    p.add_argument("--max-stale", type=int, default=2); p.set_defaults(fn=cmd_run)
+    p = sp.add_parser("conformance"); p.set_defaults(fn=cmd_conformance)
     a = ap.parse_args()
     try:
         rc = a.fn(a)

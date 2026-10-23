@@ -1,0 +1,36 @@
+# Minimum adversarial coverage at G-D3. The Breaker may run more; never less.
+# Categories are the enum in schemas/break.schema.json#campaigns[].category.
+version: "1.1"
+campaigns:
+  digital:
+    required: [security, abuse, edge, load, chaos, cost]
+    must_compare_cost_to_ledger: true
+    rule: one campaign per required category, per work order or against the integrated release
+    asks:
+      security: auth, injection, secrets, supply chain, update path, debug interfaces
+      abuse: hostile users, wrong inputs, concurrency, replay, quota abuse
+      edge: empty states, time zones, unicode, power loss mid-write, partial failure
+      load: push past the Bar's performance threshold, not up to it
+      chaos: kill dependencies, slow the network, fill the disk, revoke a token
+      cost: retry storms, log floods, egress spikes, runaway queries - measured against cost.run_monthly
+
+  physical:
+    required: [physical, abuse, supply_chain, cost]
+    also_required_if_firmware: [security]
+    must_compare_cost_to_ledger: true
+    rule: units from more than one batch; never one golden unit
+    asks:
+      physical: thermal, vibration, drop, humidity, EMI, power transient, wear, child misuse, technician misuse
+      abuse: wrong consumables, blocked vents, wrong power supply, forced disassembly
+      supply_chain: single-source parts, lead-time shock, counterfeit risk, second-source plan
+      cost: consumable burn, warranty abuse, return rate, spares burn - measured against cost.run_monthly
+      security: firmware update path, debug ports, BLE/radio pairing, provisioning secrets
+
+  hybrid:
+    required: [security, abuse, edge, load, chaos, cost, physical, supply_chain]
+    must_compare_cost_to_ledger: true
+    rule: both columns; the Blueprint names the boundary between them
+
+  escalation:
+    a_finding_that_cannot_be_fixed_within_the_bar: RE_JUDGE
+    max_bpb_iterations_before_escalation: 3

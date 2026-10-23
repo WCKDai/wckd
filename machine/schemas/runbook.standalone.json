@@ -1,0 +1,589 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Runbook",
+  "description": "Operation: owner, SLOs, alerts, on-call, maintenance, spares, patching, opex, drift, re-entry, end of life. Output of D5; kept true for the life of the thing.",
+  "type": "object",
+  "required": [
+    "id",
+    "release_id",
+    "owner",
+    "slos",
+    "alerts",
+    "oncall",
+    "maintenance_cadence",
+    "patching_policy",
+    "opex_budget_monthly",
+    "opex_actual",
+    "drift_checks",
+    "reentry_triggers",
+    "end_of_life",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "release_id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "owner": {
+      "type": "object",
+      "required": [
+        "name",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "rota"
+          ]
+        },
+        "contact": {
+          "type": "string"
+        }
+      }
+    },
+    "slos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "bar_dimension",
+          "target",
+          "measure",
+          "alert"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "bar_dimension": {
+            "$ref": "#/$defs/common_bar_dimension"
+          },
+          "target": {
+            "type": "string"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "alert": {
+            "type": "string",
+            "description": "alert id"
+          }
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "condition",
+          "route",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "tested_at": {
+            "$ref": "#/$defs/common_timestamp"
+          }
+        }
+      }
+    },
+    "oncall": {
+      "type": "object",
+      "required": [
+        "rota",
+        "escalation"
+      ],
+      "properties": {
+        "rota": {
+          "type": "string"
+        },
+        "escalation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "maintenance_cadence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "task",
+          "every",
+          "owner"
+        ],
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "every": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "last_done": {
+            "$ref": "#/$defs/common_date"
+          }
+        }
+      }
+    },
+    "spares_and_consumables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item",
+          "reorder_at",
+          "lead_time"
+        ],
+        "properties": {
+          "item": {
+            "type": "string"
+          },
+          "on_hand": {
+            "type": "integer"
+          },
+          "reorder_at": {
+            "type": "integer"
+          },
+          "lead_time": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "patching_policy": {
+      "type": "string"
+    },
+    "kept_dependencies_watched": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "version",
+          "watch"
+        ],
+        "properties": {
+          "candidate_id": {
+            "$ref": "#/$defs/common_id"
+          },
+          "version": {
+            "type": "string"
+          },
+          "watch": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "opex_budget_monthly": {
+      "$ref": "#/$defs/common_money"
+    },
+    "opex_actual": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "month",
+          "amount",
+          "evidence"
+        ],
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}$"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "over_budget_pct": {
+            "type": "number"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_evidence"
+            }
+          }
+        }
+      }
+    },
+    "drift_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "at",
+          "bar_still_met",
+          "dependencies_changed",
+          "new_candidates_found",
+          "action"
+        ],
+        "properties": {
+          "at": {
+            "$ref": "#/$defs/common_timestamp"
+          },
+          "bar_still_met": {
+            "type": "boolean"
+          },
+          "dependencies_changed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "new_candidates_found": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "none",
+              "RE_WANT",
+              "RE_CANVASS",
+              "RE_JUDGE",
+              "KILL"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_evidence"
+            }
+          }
+        }
+      }
+    },
+    "reentry_triggers": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "condition",
+          "action"
+        ],
+        "properties": {
+          "condition": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "RE_WANT",
+              "RE_CANVASS",
+              "RE_JUDGE",
+              "KILL"
+            ]
+          }
+        }
+      }
+    },
+    "end_of_life": {
+      "type": "object",
+      "required": [
+        "when",
+        "how",
+        "tell_users"
+      ],
+      "properties": {
+        "when": {
+          "type": "string"
+        },
+        "how": {
+          "type": "string",
+          "description": "from cost.exit"
+        },
+        "tell_users": {
+          "type": "string"
+        }
+      }
+    },
+    "signoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/common_provenance"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_bar_dimension": {
+      "type": "string",
+      "enum": [
+        "correctness",
+        "performance",
+        "reliability",
+        "security",
+        "safety",
+        "cost_build",
+        "cost_run",
+        "cost_unit",
+        "usability",
+        "maintainability",
+        "compliance",
+        "sustainability",
+        "exit"
+      ]
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "common_money": {
+      "type": "object",
+      "required": [
+        "amount",
+        "currency",
+        "confidence_class"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "confidence_class": {
+          "$ref": "#/$defs/common_confidence_class"
+        },
+        "basis": {
+          "type": "string",
+          "description": "how the number was derived"
+        },
+        "source": {
+          "type": "string"
+        },
+        "priced_at": {
+          "$ref": "#/$defs/common_date"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_confidence_class": {
+      "type": "string",
+      "enum": [
+        "rom",
+        "budgetary",
+        "definitive"
+      ],
+      "description": "rom +-50%, budgetary +-25%, definitive +-10%"
+    },
+    "common_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "locator",
+        "summary",
+        "captured_at",
+        "captured_by",
+        "confidence"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/common_evidence_kind"
+        },
+        "locator": {
+          "type": "string",
+          "description": "URL, path, serial, log id - whatever lets a stranger find it"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "captured_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "confidence": {
+          "$ref": "#/$defs/common_confidence"
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "tried",
+            "found",
+            "reasoned"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence_kind": {
+      "type": "string",
+      "enum": [
+        "url",
+        "file",
+        "log",
+        "measurement",
+        "repro",
+        "sample",
+        "interview",
+        "memory",
+        "receipt",
+        "photo"
+      ]
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_provenance": {
+      "type": "object",
+      "required": [
+        "produced_by",
+        "produced_at"
+      ],
+      "properties": {
+        "produced_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "produced_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_ref"
+          }
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

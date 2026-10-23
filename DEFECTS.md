@@ -69,14 +69,23 @@ Audit date: 2026-10-23. Every finding below was reproduced against the code as s
    messages and hashes. Left as-is because the schema permits any id and renaming artifacts mid-project would
    break the ids that verdicts, landscapes and plans cross-reference.
 
-10. **Physical work is untested.** The schema and gates support `realm: physical` (unit cost, pilot batch,
-    recall path, physical-stress campaign), but nothing in this repository exercises a hardware run end to end.
-    That is the next honest gap, not a bug.
+10. **Physical work is enforced but not exercised on real hardware.** v1.1 added `workflows/physical.yaml`
+    and the realm-conditional checks (certification targets, hazard analysis with controls, unit cost with MOQ
+    and lead time, pilot batch, QC plan, serials, rehearsed recall, spares, recalibration). The obligations are
+    machine-checked, but no real hardware run has been through them; the numbers (pilot batch of five, hazard
+    minimum of three) are defaults, not field-proven thresholds.
+
+11. **The new transports have known limits.** The MCP server speaks stdio with no auth (it runs with your
+    filesystem rights — that is the trust boundary); `wckd serve` is localhost-bound and its bearer token is
+    optional, so it is not an internet-facing service as shipped; `wckd run` executes steps sequentially, so
+    steps marked `parallel_with` are run in order rather than concurrently. None of these violates the
+    protocol; all three are the next layer of engineering, not silently missing behaviour.
 
 ## Verification
 
-- `python3 -m unittest discover -s tests` — 28 tests: the gate semantic rules plus a full synthetic W→D5
-  lifecycle (gate by gate, then `score`, then the append-only ledger refusal).
-- `make check` — the suite plus the worked example through G-W, G-C and `score`.
-- CI (`.github/workflows/test.yml`) — Python 3.10/3.11/3.12, the suite, `make example`, and schema validation
-  of every shipped example artifact.
+- `python3 -m unittest discover -s tests` — 45 tests: gate semantics, a full synthetic W→D5 lifecycle (gate by
+  gate, `score`, the append-only ledger refusal), the run loop against a real command, MCP over stdio, HTTP,
+  the physical refusals, manifest drift and conformance.
+- `make check` — manifest drift, conformance, the suite, and the worked example through G-W, G-C and `score`.
+- CI (`.github/workflows/test.yml`) — Python 3.10/3.11/3.12, a stdlib-only job (no PyYAML, no jsonschema), and
+  an MCP smoke test over stdio.

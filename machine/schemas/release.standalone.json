@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Release",
+  "description": "Rollout strategy, steps, go/no-go, rollback drill, manufacturing handoff. Output of D4.",
+  "type": "object",
+  "required": [
+    "id",
+    "plan_id",
+    "strategy",
+    "environments",
+    "steps",
+    "go_no_go",
+    "rollback",
+    "monitoring_live_before_cutover",
+    "findings_all_dispositioned",
+    "outcome",
+    "provenance"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "plan_id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "strategy": {
+      "type": "string",
+      "enum": [
+        "canary",
+        "staged",
+        "blue_green",
+        "pilot_batch",
+        "big_bang"
+      ]
+    },
+    "big_bang_justification": {
+      "type": "string"
+    },
+    "environments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "order",
+          "action",
+          "criteria_to_proceed",
+          "signs"
+        ],
+        "properties": {
+          "order": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string"
+          },
+          "criteria_to_proceed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "signs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_role"
+            }
+          },
+          "done_at": {
+            "$ref": "#/$defs/common_timestamp"
+          }
+        }
+      }
+    },
+    "go_no_go": {
+      "type": "object",
+      "required": [
+        "criteria",
+        "signoffs"
+      ],
+      "properties": {
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "signoffs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_signoff"
+          }
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "required": [
+        "method",
+        "drill_at",
+        "drill_result",
+        "drill_time",
+        "max_acceptable_time"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "drill_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "drill_result": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "drill_time": {
+          "type": "string"
+        },
+        "max_acceptable_time": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_evidence"
+          }
+        }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "required": [
+        "pilot_batch_size",
+        "manufacturing_handoff",
+        "qc_sampling_plan",
+        "serial_tracking",
+        "logistics",
+        "repair_recall_path"
+      ],
+      "properties": {
+        "pilot_batch_size": {
+          "type": "integer"
+        },
+        "manufacturing_handoff": {
+          "type": "string"
+        },
+        "supplier_confirmations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "qc_sampling_plan": {
+          "type": "string"
+        },
+        "serial_tracking": {
+          "type": "string"
+        },
+        "logistics": {
+          "type": "string"
+        },
+        "repair_recall_path": {
+          "type": "object",
+          "required": [
+            "description",
+            "rehearsed_at",
+            "rehearsal_result"
+          ],
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "rehearsed_at": {
+              "$ref": "#/$defs/common_timestamp"
+            },
+            "rehearsal_result": {
+              "type": "string",
+              "enum": [
+                "pass",
+                "fail"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "monitoring_live_before_cutover": {
+      "type": "boolean"
+    },
+    "findings_all_dispositioned": {
+      "type": "boolean"
+    },
+    "cost_reestimate_at_gate": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "in_progress",
+            "shipped",
+            "rolled_back",
+            "held"
+          ]
+        },
+        "incidents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeline": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "signoffs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/common_provenance"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "big_bang"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "big_bang_justification"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "locator",
+        "summary",
+        "captured_at",
+        "captured_by",
+        "confidence"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/common_evidence_kind"
+        },
+        "locator": {
+          "type": "string",
+          "description": "URL, path, serial, log id - whatever lets a stranger find it"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "captured_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "confidence": {
+          "$ref": "#/$defs/common_confidence"
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "tried",
+            "found",
+            "reasoned"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence_kind": {
+      "type": "string",
+      "enum": [
+        "url",
+        "file",
+        "log",
+        "measurement",
+        "repro",
+        "sample",
+        "interview",
+        "memory",
+        "receipt",
+        "photo"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_provenance": {
+      "type": "object",
+      "required": [
+        "produced_by",
+        "produced_at"
+      ],
+      "properties": {
+        "produced_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "produced_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/common_ref"
+          }
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

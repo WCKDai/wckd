@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Message",
+  "description": "The envelope for every inter-agent communication in WCKD.",
+  "type": "object",
+  "required": [
+    "id",
+    "at",
+    "from",
+    "to",
+    "project",
+    "phase",
+    "type",
+    "subject",
+    "body"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "at": {
+      "$ref": "#/$defs/common_timestamp"
+    },
+    "from": {
+      "$ref": "#/$defs/common_role"
+    },
+    "to": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/common_role"
+      }
+    },
+    "project": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "W",
+        "C",
+        "K",
+        "D",
+        "operation"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "handoff",
+        "request",
+        "finding",
+        "verdict",
+        "escalation",
+        "gate",
+        "broadcast",
+        "lesson",
+        "bar_change_request"
+      ]
+    },
+    "subject": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_ref"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/common_evidence"
+      }
+    },
+    "confidence": {
+      "$ref": "#/$defs/common_confidence"
+    },
+    "positions": {
+      "type": "array",
+      "description": "for escalations: each side, written down",
+      "items": {
+        "type": "object",
+        "required": [
+          "held_by",
+          "position"
+        ],
+        "properties": {
+          "held_by": {
+            "$ref": "#/$defs/common_role"
+          },
+          "position": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "proposed_decision": {
+      "type": "string"
+    },
+    "proposed_phase": {
+      "type": "string",
+      "enum": [
+        "W",
+        "C",
+        "K",
+        "D"
+      ]
+    },
+    "severity": {
+      "$ref": "#/$defs/common_severity"
+    },
+    "needs_reply_by": {
+      "$ref": "#/$defs/common_timestamp"
+    },
+    "in_reply_to": {
+      "$ref": "#/$defs/common_id"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_ref": {
+      "type": "object",
+      "required": [
+        "artifact",
+        "path"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of the file at hand-off"
+        },
+        "fragment": {
+          "type": "string",
+          "description": "optional JSON pointer or field"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "locator",
+        "summary",
+        "captured_at",
+        "captured_by",
+        "confidence"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/common_evidence_kind"
+        },
+        "locator": {
+          "type": "string",
+          "description": "URL, path, serial, log id - whatever lets a stranger find it"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "captured_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "confidence": {
+          "$ref": "#/$defs/common_confidence"
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "tried",
+            "found",
+            "reasoned"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence_kind": {
+      "type": "string",
+      "enum": [
+        "url",
+        "file",
+        "log",
+        "measurement",
+        "repro",
+        "sample",
+        "interview",
+        "memory",
+        "receipt",
+        "photo"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_severity": {
+      "type": "string",
+      "enum": [
+        "crit",
+        "high",
+        "med",
+        "low",
+        "info"
+      ]
+    }
+  }
+}

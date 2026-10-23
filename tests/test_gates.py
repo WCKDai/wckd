@@ -121,8 +121,23 @@ class TestVerdict(Base):
                    "provenance": {"produced_by": "judge", "produced_at": "2026-10-23T00:00:00+00:00"}}
         blueprint = {"id": "bp", "verdict_id": "v", "scope": {"build": [], "bend": []}, "components": [], "adrs": [],
                      "reversibility_plan": [], "non_goals": [], "open_risks": [],
+                     "physical_spec": {"certification_targets": ["FCC Part 15 B", "CE"],
+                                       "serviceability": "sensor door, no factory return"},
+                     "hazard_analysis": [
+                         {"id": "H1", "hazard": "mains contact", "severity": "high", "likelihood": 2, "control": "isolated PSU"},
+                         {"id": "H2", "hazard": "sensor false low", "severity": "med", "likelihood": 3, "control": "weekly calibration check"},
+                         {"id": "H3", "hazard": "dust on inlet", "severity": "low", "likelihood": 4, "control": "filter and cleaning cadence"}],
                      "provenance": {"produced_by": "architect", "produced_at": "2026-10-23T00:00:00+00:00"}}
-        cost = {"id": "c", "within_ceiling": True}
+        cost = {"id": "c", "within_ceiling": True,
+                "build": {"people": [], "tools": [], "materials": [], "prototypes": [], "nre": [],
+                          "certification": [{"item": "FCC Part 15 B", "amount": 1500, "confidence_class": "budgetary"}],
+                          "total": 1500},
+                "unit": {"volume": 50,
+                         "bom": [{"item": "SCD41", "amount": 22, "confidence_class": "budgetary"}],
+                         "assembly": [], "test": [], "packaging": [], "shipping": [], "warranty_reserve": [],
+                         "moq_notes": "MOQ 10 on the enclosure", "lead_time_notes": "6 weeks on the sensor",
+                         "total_per_unit": 61},
+                "run_monthly": {"digital": [], "physical": [], "people": [], "total": 2}}
         prospect = {"id": "p", "kill_criteria": ["no demand"]}
         plan = {"id": "pl", "milestones": [], "work_orders": [], "critical_path": [], "crews": [],
                 "premortem": {"run_at": "2026-10-23T00:00:00+00:00", "with": "breaker",
@@ -241,6 +256,103 @@ class TestScore(Base):
         row = wckd.ledger_row("proj", self.pdir, rows, {})
         self.assertEqual(row.count("|"), 24)                    # 23 separators: 12 goal marks + 11 other cells
         self.assertTrue(row.startswith("| proj |"))
+
+
+class TestPhysical(Base):
+    """The physical column has its own obligations; a digital-only reading of the gate must fail."""
+
+    def _physical_project(self):
+        self.brief["realm"] = "physical"
+        self.write("brief.json", self.brief)
+        self.write("verdict.json", {"id": "v", "brief_id": "b", "landscape_id": "l", "overall": "PROCEED",
+                                    "overall_rationale": "r", "reuse_ratio": 0.83,
+                                    "decisions": [{"capability_id": c["id"], "verdict": "KEEP", "chosen_candidate": "cand-ha",
+                                                   "rationale": "r", "confidence": 0.8,
+                                                   "evidence": [{"kind": "url", "locator": "x", "summary": "s",
+                                                                 "captured_at": "2026-10-23T00:00:00+00:00",
+                                                                 "captured_by": "judge", "confidence": 0.8}]}
+                                                  for c in self.brief["capabilities"]],
+                                    "signoffs": [{"by": "judge", "role": "judge", "at": "2026-10-23T00:00:00+00:00",
+                                                  "decision": "approve"}],
+                                    "provenance": {"produced_by": "judge", "produced_at": "2026-10-23T00:00:00+00:00"}})
+
+    def test_gk_refuses_a_physical_blueprint_with_no_hazards_or_certification(self):
+        self._physical_project()
+        self.write("blueprint.json", {"id": "bp", "verdict_id": "v", "scope": {"build": [], "bend": []},
+                                      "components": [], "adrs": [], "reversibility_plan": [], "non_goals": [],
+                                      "open_risks": [],
+                                      "provenance": {"produced_by": "architect", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        self.write("cost.json", {"id": "c", "within_ceiling": True})
+        self.write("prospect.json", {"id": "pr", "kill_criteria": ["no demand"]})
+        self.write("plan.json", {"id": "pl", "milestones": [], "work_orders": [], "critical_path": [], "crews": [],
+                                 "premortem": {"run_at": "2026-10-23T00:00:00+00:00", "with": ["breaker"],
+                                               "failures": [{"story": "a", "mitigation_or_tripwire": "b"}] * 3},
+                                 "schedule_confidence": 0.6,
+                                 "provenance": {"produced_by": "planner", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        problems = wckd.semantic_checks("G-K", self.pdir)
+        self.assertTrue(any("certification_targets is empty" in p for p in problems))
+        self.assertTrue(any("hazard_analysis" in p for p in problems))
+        self.assertTrue(any("cost.unit is missing" in p for p in problems))
+
+    def test_gd4_refuses_a_physical_release_with_no_pilot_batch(self):
+        self._physical_project()
+        self.write("release.json", {"id": "r", "plan_id": "pl", "strategy": "pilot", "environments": [],
+                                    "steps": [{"order": 1, "action": "build", "criteria_to_proceed": ["ok"], "signs": ["shipper"]}],
+                                    "go_no_go": {"criteria": [], "signoffs": []},
+                                    "rollback": {"method": "repair", "drill_at": "2026-10-23T00:00:00+00:00",
+                                                 "drill_result": "pass", "drill_time": "1 h", "max_acceptable_time": "1 d"},
+                                    "monitoring_live_before_cutover": True, "findings_all_dispositioned": True,
+                                    "cost_reestimate_at_gate": "G-D4", "outcome": {"status": "shipped"},
+                                    "hardware": {"pilot_batch_size": 2, "manufacturing_handoff": "CM",
+                                                 "qc_sampling_plan": "", "serial_tracking": "",
+                                                 "logistics": "courier",
+                                                 "repair_recall_path": {"description": "swap unit",
+                                                                        "rehearsed_at": "2026-10-23T00:00:00+00:00",
+                                                                        "rehearsal_result": "fail"}},
+                                    "provenance": {"produced_by": "shipper", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        problems = wckd.semantic_checks("G-D4", self.pdir)
+        self.assertTrue(any("pilot_batch_size is 2" in p for p in problems))
+        self.assertTrue(any("qc_sampling_plan is empty" in p for p in problems))
+        self.assertTrue(any("repair/recall path was not rehearsed" in p for p in problems))
+
+    def test_gd3_requires_the_campaign_categories_for_the_realm(self):
+        self._physical_project()
+        (self.pdir / "breaches").mkdir()
+        self.write("breaches/BR-1.json", {"id": "BR-1", "target": {"kind": "wo", "ref": "WO-1"}, "breaker": "breaker",
+                                          "independence_attestation": {"independent": True, "note": "n"},
+                                          "campaigns": [{"category": "security", "ran": True, "method": "ports", "outcome": "none"}],
+                                          "verdict": "HARDENED", "findings": [],
+                                          "cost_compared_to_ledger": "", "provenance": {"produced_by": "breaker", "produced_at": "2026-10-23T00:00:00+00:00"}})
+        problems = wckd.semantic_checks("G-D3", self.pdir)
+        joined = " ".join(problems)
+        self.assertIn("physical", joined)
+        self.assertIn("supply_chain", joined)
+        self.assertIn("cost campaign", joined)
+
+
+class TestManifest(Base):
+    def test_manifest_is_current_and_conforms(self):
+        from tree import Tree
+        t = Tree()
+        try:
+            out = t.cli("manifest", "--check")
+            self.assertIn("up to date", out)
+            out = t.cli("conformance")
+            self.assertIn("16/16 conformance cases pass", out)
+        finally:
+            t.close()
+
+    def test_compiled_protocol_has_every_role_and_gate(self):
+        from tree import Tree
+        t = Tree()
+        try:
+            proto = json.loads((t.root / "machine" / "protocol.json").read_text())
+            self.assertEqual(len(proto["gates"]), 8)
+            self.assertEqual(len(proto["roles"]), 17)
+            self.assertEqual(len(proto["phases"]), 4)
+            self.assertEqual(proto["tolerances"]["min_source_classes"], 5)
+        finally:
+            t.close()
 
 
 class TestConditions(Base):

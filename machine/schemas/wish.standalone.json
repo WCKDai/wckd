@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Wish",
+  "description": "The human's words, verbatim. Created by `wckd new`.",
+  "type": "object",
+  "required": [
+    "id",
+    "text",
+    "by",
+    "at"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/common_id"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "by": {
+      "type": "string"
+    },
+    "at": {
+      "$ref": "#/$defs/common_timestamp"
+    },
+    "context": {
+      "type": "string",
+      "description": "anything else the human said, verbatim"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "common_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

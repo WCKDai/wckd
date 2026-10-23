@@ -20,33 +20,60 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: install
         run: python -m pip install --upgrade pip pyyaml jsonschema
-      - name: semantic and end-to-end gate tests
+      - name: the compiled protocol matches its sources
+        run: python bin/wckd.py manifest --check
+      - name: language-independent conformance cases
+        run: python bin/wckd.py conformance
+      - name: gate rules, lifecycle, run loop, MCP, HTTP, physical
         run: python -m unittest discover -s tests -v
       - name: the worked example passes its own gates
         run: make example
-      - name: every shipped artifact validates against its schema
+
+  stdlib-only:
+    # the promise: wckd runs where only Python exists - no pip, no YAML, no jsonschema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: no dependencies, no YAML, gates still enforce
+        env:
+          WCKD_NO_YAML: "1"
         run: |
+          set -e
+          python bin/wckd.py new smoke "A want with no dependencies installed" | head -3
+          python bin/wckd.py next smoke | head -5
+          cp examples/air-quality-monitor/brief.json projects/smoke/
+          python bin/wckd.py gate smoke G-W --by CI --human | head -2
+          python bin/wckd.py status smoke | tail -3
           python - <<'PY'
-          import glob, json, sys
-          from jsonschema import Draft202012Validator
-          from referencing import Registry, Resource
-          from referencing.jsonschema import DRAFT202012
-          schemas = {}
-          for p in glob.glob("schemas/*.schema.json"):
-              s = json.load(open(p)); schemas[s["$id"]] = s
-          reg = Registry().with_resources([(k, Resource.from_contents(v, default_specification=DRAFT202012))
-                                           for k, v in schemas.items()])
-          V = {k.rsplit("/", 1)[-1].replace(".schema.json", ""): Draft202012Validator(v, registry=reg)
-               for k, v in schemas.items()}
-          bad = 0
-          for name, path in (("wish", "examples/air-quality-monitor/wish.json"),
-                             ("brief", "examples/air-quality-monitor/brief.json"),
-                             ("landscape", "examples/air-quality-monitor/landscape.json"),
-                             ("verdict", "examples/air-quality-monitor/verdict.json")):
-              errs = list(V[name].iter_errors(json.load(open(path))))
-              print(f"{'ok ' if not errs else 'BAD'} {path}")
-              bad += bool(errs)
-              for e in errs[:3]:
-                  print("   ", "/".join(map(str, e.path)) or "<root>", e.message[:160])
-          sys.exit(1 if bad else 0)
+          import json
+          g = json.load(open("projects/smoke/gates/G-W.json"))
+          assert g["decision"] == "PASS" and g["human_signoff"]["by"] == "CI", g
+          print("stdlib-only gate record verified")
+          PY
+
+  mcp-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyyaml jsonschema
+      - name: MCP handshake and a tool call over stdio
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"wckd_new","arguments":{"slug":"ci","wish":"a CLI that says hi"}}}' \
+          | python bin/wckd_mcp.py > /tmp/mcp.out
+          python - <<'PY'
+          import json
+          lines = [json.loads(l) for l in open("/tmp/mcp.out") if l.strip()]
+          assert lines[0]["result"]["serverInfo"]["name"] == "wckd"
+          assert len(lines[1]["result"]["tools"]) == 12
+          assert "created projects/ci" in lines[2]["result"]["content"][0]["text"]
+          print("MCP verified:", len(lines[1]["result"]["tools"]), "tools")
           PY

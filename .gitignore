@@ -1,2 +1,4 @@
 projects/*
 __pycache__/
+.turns/
+*.tmp

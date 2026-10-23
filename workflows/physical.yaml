@@ -1,0 +1,49 @@
+# Physical-specific obligations. The same eight gates apply; these are what a
+# digital-only interpretation would miss. Enforced by the CLI where it can be,
+# and stated here so any other implementation gates at the same place.
+version: "1.1"
+
+certification_matrix:
+  - market: US
+    marks: ["FCC Part 15 B (unintentional radiator)", "FCC ID (if radio)", "UL/ETL (if mains-connected)"]
+  - market: EU
+    marks: ["CE", "EMC 2014/30/EU", "RED 2014/53/EU (if radio)", "RoHS 2011/65/EU", "WEEE registration"]
+  - market: UK
+    marks: ["UKCA"]
+  - market: CA
+    marks: ["ISED (if radio)"]
+rule: every market you will sell into is named at G-K with its marks and status; certification is NRE in cost.build
+
+dfm_checklist:
+  - every part has a second source or a written single-source risk
+  - minimum order quantities and lead times are priced into cost.unit
+  - assembly method stated (hand, reflow, contract manufacturer) with a time per unit
+  - test fixture or test procedure exists before the pilot batch
+  - enclosure tolerances and ingress protection stated where it matters
+  - serviceability: how a sensor or battery is replaced without a factory return
+
+sourcing:
+  second_source_rule: every critical component names an alternative or the risk it carries
+  quote_rule: unit cost is priced at the planned volume, with the quote date
+  long_lead_rule: long-lead items get their own work order, ordered before the critical path needs them
+
+pilot_batch:
+  min_units: 5
+  qc_plan: sampling plan and defect classes written before the batch
+  serial_tracking: required for every unit that leaves the bench
+  recall_path: rehearsed on real units before G-D4, with a measured time
+
+calibration:
+  traceable: every sensing element is checked against a reference, with the reference and date recorded
+  cadence: the maintenance cadence in the runbook includes recalibration
+  drift: field drift is a monitored SLO, not a surprise
+
+hazard_analysis:
+  min_entries: 3
+  fields: [hazard, severity, likelihood, control]
+  rule: a hazard with no control is an open risk that must be named in blueprint.open_risks
+
+end_of_life:
+  spares_years: state how long spares and consumables will be available
+  disposal: state the disposal or recycling path per market
+  firmware: state the last supported firmware date at G-D5

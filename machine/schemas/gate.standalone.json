@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Gate record",
+  "description": "The decision at a gate, with checked artifacts, criteria, evidence and sign-offs.",
+  "type": "object",
+  "required": [
+    "gate_id",
+    "project",
+    "at",
+    "artifacts_checked",
+    "criteria",
+    "decision",
+    "signoffs"
+  ],
+  "properties": {
+    "gate_id": {
+      "type": "string",
+      "enum": [
+        "G-W",
+        "G-C",
+        "G-K",
+        "G-D1",
+        "G-D2",
+        "G-D3",
+        "G-D4",
+        "G-D5"
+      ]
+    },
+    "project": {
+      "type": "string"
+    },
+    "at": {
+      "$ref": "#/$defs/common_timestamp"
+    },
+    "reentry": {
+      "type": "boolean",
+      "default": false
+    },
+    "artifacts_checked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "valid"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "statement",
+          "met"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "met": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/common_evidence"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "PASS_WITH_CONDITIONS",
+        "KILL",
+        "WAIT"
+      ],
+      "description": "KILL and WAIT are terminal: the project ends (KILL) or sleeps until a tripwire fires (WAIT)."
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "statement",
+          "owner",
+          "due_gate"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/$defs/common_role"
+          },
+          "due_gate": {
+            "type": "string"
+          },
+          "closed_at": {
+            "$ref": "#/$defs/common_timestamp"
+          },
+          "closed_by": {
+            "type": "string"
+          },
+          "closed_note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cost_reestimate": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "$ref": "#/$defs/common_money"
+        },
+        "run_monthly": {
+          "$ref": "#/$defs/common_money"
+        },
+        "variance_within_class": {
+          "type": "boolean"
+        }
+      }
+    },
+    "signoffs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/common_signoff"
+      }
+    },
+    "human_signoff": {
+      "$ref": "#/$defs/common_signoff"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "gate_id": {
+            "enum": [
+              "G-W",
+              "G-K",
+              "G-D4"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "PASS",
+              "PASS_WITH_CONDITIONS"
+            ]
+          }
+        },
+        "required": [
+          "gate_id",
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "human_signoff"
+        ]
+      },
+      "description": "The three human-veto gates cannot PASS without a human. A FAIL, KILL or WAIT is not a human veto and needs none."
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "const": "PASS_WITH_CONDITIONS"
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "conditions"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "common_timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common_evidence": {
+      "type": "object",
+      "required": [
+        "kind",
+        "locator",
+        "summary",
+        "captured_at",
+        "captured_by",
+        "confidence"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/common_evidence_kind"
+        },
+        "locator": {
+          "type": "string",
+          "description": "URL, path, serial, log id - whatever lets a stranger find it"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "captured_by": {
+          "$ref": "#/$defs/common_role"
+        },
+        "confidence": {
+          "$ref": "#/$defs/common_confidence"
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "tried",
+            "found",
+            "reasoned"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_evidence_kind": {
+      "type": "string",
+      "enum": [
+        "url",
+        "file",
+        "log",
+        "measurement",
+        "repro",
+        "sample",
+        "interview",
+        "memory",
+        "receipt",
+        "photo"
+      ]
+    },
+    "common_role": {
+      "type": "string",
+      "enum": [
+        "conductor",
+        "scribe",
+        "listener",
+        "barkeeper",
+        "scout",
+        "appraiser",
+        "cartographer",
+        "judge",
+        "architect",
+        "quartermaster",
+        "prospector",
+        "planner",
+        "builder",
+        "validator",
+        "breaker",
+        "shipper",
+        "keeper",
+        "human"
+      ]
+    },
+    "common_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "common_money": {
+      "type": "object",
+      "required": [
+        "amount",
+        "currency",
+        "confidence_class"
+      ],
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3
+        },
+        "confidence_class": {
+          "$ref": "#/$defs/common_confidence_class"
+        },
+        "basis": {
+          "type": "string",
+          "description": "how the number was derived"
+        },
+        "source": {
+          "type": "string"
+        },
+        "priced_at": {
+          "$ref": "#/$defs/common_date"
+        }
+      },
+      "additionalProperties": false
+    },
+    "common_confidence_class": {
+      "type": "string",
+      "enum": [
+        "rom",
+        "budgetary",
+        "definitive"
+      ],
+      "description": "rom +-50%, budgetary +-25%, definitive +-10%"
+    },
+    "common_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "common_signoff": {
+      "type": "object",
+      "required": [
+        "by",
+        "role",
+        "at",
+        "decision"
+      ],
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/common_role"
+        },
+        "at": {
+          "$ref": "#/$defs/common_timestamp"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "reject",
+            "approve_with_conditions"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
