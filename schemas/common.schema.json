@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/common.schema.json",
+  "title": "WCKD common definitions",
+  "description": "Shared building blocks referenced by every WCKD artifact schema.",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "date": { "type": "string", "format": "date" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "confidence_class": { "type": "string", "enum": ["rom", "budgetary", "definitive"], "description": "rom +-50%, budgetary +-25%, definitive +-10%" },
+    "severity": { "type": "string", "enum": ["crit", "high", "med", "low", "info"] },
+    "realm": { "type": "string", "enum": ["digital", "physical", "hybrid"] },
+    "priority": { "type": "string", "enum": ["must", "should", "could"] },
+    "role": { "type": "string", "enum": ["conductor", "scribe", "listener", "barkeeper", "scout", "appraiser", "cartographer", "judge", "architect", "quartermaster", "prospector", "planner", "builder", "validator", "breaker", "shipper", "keeper", "human"] },
+    "bar_dimension": { "type": "string", "enum": ["correctness", "performance", "reliability", "security", "safety", "cost_build", "cost_run", "cost_unit", "usability", "maintainability", "compliance", "sustainability", "exit"] },
+    "source_class": { "type": "string", "enum": ["open_source", "commercial_cots", "internal_prior", "academic_patent_standard", "physical_supplier", "community_issue_tracker", "adjacent_domain"] },
+    "evidence_kind": { "type": "string", "enum": ["url", "file", "log", "measurement", "repro", "sample", "interview", "memory", "receipt", "photo"] },
+    "evidence": {
+      "type": "object",
+      "required": ["kind", "locator", "summary", "captured_at", "captured_by", "confidence"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/evidence_kind" },
+        "locator": { "type": "string", "description": "URL, path, serial, log id - whatever lets a stranger find it" },
+        "summary": { "type": "string" },
+        "captured_at": { "$ref": "#/$defs/timestamp" },
+        "captured_by": { "$ref": "#/$defs/role" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "grade": { "type": "string", "enum": ["measured", "tried", "found", "reasoned"] }
+      },
+      "additionalProperties": false
+    },
+    "money": {
+      "type": "object",
+      "required": ["amount", "currency", "confidence_class"],
+      "properties": {
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+        "confidence_class": { "$ref": "#/$defs/confidence_class" },
+        "basis": { "type": "string", "description": "how the number was derived" },
+        "source": { "type": "string" },
+        "priced_at": { "$ref": "#/$defs/date" }
+      },
+      "additionalProperties": false
+    },
+    "signoff": {
+      "type": "object",
+      "required": ["by", "role", "at", "decision"],
+      "properties": {
+        "by": { "type": "string" },
+        "role": { "$ref": "#/$defs/role" },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "decision": { "type": "string", "enum": ["approve", "reject", "approve_with_conditions"] },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "ref": {
+      "type": "object",
+      "required": ["artifact", "path"],
+      "properties": {
+        "artifact": { "type": "string" },
+        "path": { "type": "string" },
+        "hash": { "type": "string", "description": "sha256 of the file at hand-off" },
+        "fragment": { "type": "string", "description": "optional JSON pointer or field" }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["produced_by", "produced_at"],
+      "properties": {
+        "produced_by": { "$ref": "#/$defs/role" },
+        "produced_at": { "$ref": "#/$defs/timestamp" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "runtime": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "bar_change": {
+      "type": "object",
+      "required": ["dimension", "old", "new", "why", "requested_by", "signoffs"],
+      "properties": {
+        "dimension": { "$ref": "#/$defs/bar_dimension" },
+        "old": {}, "new": {},
+        "why": { "type": "string" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+        "requested_by": { "$ref": "#/$defs/role" },
+        "signoffs": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/signoff" }, "description": "barkeeper and human" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

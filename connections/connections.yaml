@@ -1,0 +1,82 @@
+# WCKD connections: who talks to whom, on what topic, about which artifact.
+# Every message satisfies schemas/message.schema.json. Topic names are a convention for any bus
+# (filesystem queue, Slack channel, NATS subject, Plane/Linear project); adapt the transport, keep the names.
+
+bus:
+  topic_pattern: "wckd.<project>.<phase>.<type>"
+  phases: [W, C, K, D, operation]
+  types: [handoff, request, finding, verdict, escalation, gate, broadcast, lesson, bar_change_request]
+  retention: forever (messages are provenance)
+  transport_examples:
+    filesystem: projects/<slug>/messages/<timestamp>-<from>-<type>.json
+    chat: "#wckd-<project> channel, with the message type as a thread prefix"
+    tracker: one issue per work order; messages as comments
+
+handoffs:   # from -> to : artifact (fragment) -- the normal flow
+  - { from: human,        to: listener,     artifact: wish.json }
+  - { from: listener,     to: barkeeper,    artifact: brief.json,                  note: all but bar and done_condition }
+  - { from: barkeeper,    to: listener,     artifact: brief.json#bar }
+  - { from: listener,     to: conductor,    artifact: brief.json,                  gate: G-W }
+  - { from: conductor,    to: scout,        artifact: brief.json,                  on: G-W pass }
+  - { from: scout,        to: appraiser,    artifact: landscape.json#candidates }
+  - { from: appraiser,    to: cartographer, artifact: landscape.json#graveyard }
+  - { from: cartographer, to: conductor,    artifact: landscape.json,              gate: G-C }
+  - { from: conductor,    to: judge,        artifact: landscape.json,              on: G-C pass }
+  - { from: judge,        to: [architect, quartermaster, prospector], artifact: verdict.json, on: overall PROCEED }
+  - { from: judge,        to: [scribe, human], artifact: verdict.json,              on: overall KILL or WAIT }
+  - { from: architect,    to: [planner, quartermaster], artifact: blueprint.json }
+  - { from: quartermaster, to: [prospector, planner], artifact: cost.json }
+  - { from: prospector,   to: planner,      artifact: prospect.json }
+  - { from: planner,      to: conductor,    artifact: plan.json,                   gate: G-K }
+  - { from: conductor,    to: builder,      artifact: workorders/WO-*.json,        on: G-K pass, per: workorder }
+  - { from: builder,      to: validator,    artifact: workorders/WO-*.json,        on: status built }
+  - { from: validator,    to: breaker,      artifact: proofs/WO-*.proof.json,      on: result PROVEN }
+  - { from: validator,    to: builder,      artifact: proofs/WO-*.proof.json,      on: result PARTIAL or FAILED, type: finding }
+  - { from: breaker,      to: builder,      artifact: breaches/BR-*.json#findings, on: any open finding, type: finding }
+  - { from: builder,      to: validator,    artifact: workorders/WO-*.json,        on: fix pushed (retest) }
+  - { from: validator,    to: breaker,      artifact: proofs/*.proof.json,         on: retest PROVEN (confirm) }
+  - { from: breaker,      to: conductor,    artifact: breaches/BR-*.json,          gate: G-D3 }
+  - { from: conductor,    to: shipper,      artifact: plan.json,                   on: G-D3 pass }
+  - { from: shipper,      to: keeper,       artifact: release.json }
+  - { from: keeper,       to: shipper,      artifact: runbook.json#slos,           note: monitoring live before cutover }
+  - { from: shipper,      to: conductor,    artifact: release.json,                gate: G-D4 }
+  - { from: keeper,       to: scribe,       artifact: runbook.json }
+  - { from: scribe,       to: conductor,    artifact: lessons.md,                  gate: G-D5 }
+  - { from: quartermaster, to: keeper,      artifact: cost.json#run_monthly,       note: becomes opex_budget_monthly }
+
+broadcasts:   # events everyone (or the human) hears immediately, not at the next gate
+  - { event: finding.severity.crit,      to: [builder, architect, keeper, conductor, human] }
+  - { event: verdict.overall.KILL,       to: [all, human] }
+  - { event: cost.variance_beyond_class, to: [judge, prospector, planner, conductor, human] }
+  - { event: bar_change_request,         to: [barkeeper, judge, conductor, human] }
+  - { event: bar_change.signed,          to: [all] }
+  - { event: kept_dependency.changed,    to: [architect, keeper, judge, conductor] }
+  - { event: reentry.triggered,          to: [conductor, human] }
+
+requests:   # who may ask whom for what (type: request)
+  - { from: judge,        to: quartermaster, for: ROM cost of a candidate BUILD before deciding }
+  - { from: judge,        to: scout,         for: RE_CANVASS of named capabilities }
+  - { from: builder,      to: [architect, planner], for: spec clarification; interface mismatch with a kept part }
+  - { from: validator,    to: builder,       for: documentation of an undocumented step }
+  - { from: breaker,      to: human,         for: acceptance signature on a CRIT or HIGH finding }
+  - { from: shipper,      to: quartermaster, for: gate cost re-estimate }
+  - { from: keeper,       to: barkeeper,     for: bar_change (never changes a threshold itself) }
+  - { from: anyone,       to: conductor,     for: escalation; stalled step; skill-ownership question }
+
+escalation:
+  ladder: [agent, conductor, human]
+  message: type escalation; positions[] with both sides; proposed_decision; proposed_phase when re-entry
+  conductor_resolves: routing, sequencing, scope-of-role questions
+  conductor_does_not_resolve: factual disputes (evidence does), verdict appeals (judge re-issues; human may overrule), Bar changes (barkeeper + human)
+
+turnaround:   # expectations, in protocol cycles (a cycle is whatever one dispatch round is in your runtime)
+  reply_to_request: 1
+  handoff_validation_by_conductor: 1
+  escalation_to_human_response: 2
+  stalled_step_detection: 2 cycles without artifact change
+  gate_review: 1 after all required artifacts validate
+
+independence_enforced_by_conductor:
+  per_workorder: builder != validator != breaker
+  per_phase: judge != architect; quartermaster independent of planner schedule
+  conductor: never produces a domain artifact

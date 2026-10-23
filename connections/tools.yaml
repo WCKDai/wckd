@@ -1,0 +1,65 @@
+# WCKD tool bindings. Tool classes are abstract; bind each to what your runtime offers.
+# A role may only use tool classes listed for it. Everything else is a protocol violation the Conductor records.
+
+tool_classes:
+  filesystem:         read/write project artifacts under projects/<slug>/
+  memory:             read memory/LESSONS.md and memory/LEDGER.md; append (scribe only)
+  message_bus:        send/receive messages per connections.yaml
+  wckd_cli:           bin/wckd.py (new, next, validate, gate, status)
+  ask_human:          put a question or decision in front of the human and wait
+  web_search:         general web search (bind to web_search / extended search)
+  web_fetch:          fetch pages, docs, pricing pages, datasheets
+  package_registries: npm, PyPI, crates, Maven, Docker Hub, app stores
+  repo_search:        GitHub/GitLab code and issue search; internal repos
+  issue_trackers:     issues, post-mortems, changelogs, recall databases
+  supplier_catalogs:  Digi-Key/Mouser-class catalogs, distributors, McMaster-class, contract manufacturers
+  pricing_apis:       cloud pricing, SaaS price pages, vendor quotes
+  cloud_pricing:      calculators for compute/storage/egress at the planned usage
+  spreadsheets:       cost models (xlsx) when a ledger needs a model behind it
+  sandbox:            isolated environment to install/run/call candidates and builds
+  lab_bench:          power supply, meters, scope, environmental chamber, fixtures; sample ordering
+  cad_eda:            mechanical CAD, PCB/EDA, simulation
+  repo:               the project's source control (write)
+  ci:                 build and test runners
+  ci_cd:              deployment pipelines
+  environments:       staging, canary, production; device fleets
+  feature_flags:      runtime toggles for rollback
+  monitoring:         metrics, logs, traces, field-return and calibration data
+  alerting:           alert routing and paging
+  billing:            invoices, meters, cost explorer
+  inventory:          spares, consumables, serials
+  load_tools:         load generators
+  security_tools:     scanners, fuzzers, proxies; physical port and firmware tools
+  chaos_tools:        fault injection
+  supplier_portals:   purchase orders, manufacturing handoff, QC reports
+  logistics:          shipping, tracking, customs
+  tracker:            work-order tracking (Plane/Linear/Jira-class)
+
+roles:
+  conductor:     [filesystem, memory, message_bus, wckd_cli, ask_human]
+  scribe:        [filesystem, memory, message_bus]
+  listener:      [filesystem, memory, message_bus, ask_human]
+  barkeeper:     [filesystem, memory, message_bus, ask_human, web_search, web_fetch]
+  scout:         [filesystem, memory, message_bus, web_search, web_fetch, package_registries, repo_search, supplier_catalogs, sandbox, lab_bench, issue_trackers]
+  appraiser:     [filesystem, memory, message_bus, web_search, web_fetch, repo_search, issue_trackers, sandbox, lab_bench]
+  cartographer:  [filesystem, memory, message_bus]
+  judge:         [filesystem, memory, message_bus, ask_human]
+  architect:     [filesystem, memory, message_bus, web_fetch, repo_search, cad_eda]
+  quartermaster: [filesystem, memory, message_bus, web_search, web_fetch, pricing_apis, cloud_pricing, supplier_catalogs, spreadsheets, billing]
+  prospector:    [filesystem, memory, message_bus, web_search, web_fetch]
+  planner:       [filesystem, memory, message_bus, tracker]
+  builder:       [filesystem, message_bus, repo, sandbox, ci, cad_eda, lab_bench, package_registries]
+  validator:     [filesystem, message_bus, sandbox, ci, lab_bench]
+  breaker:       [filesystem, message_bus, sandbox, load_tools, security_tools, chaos_tools, lab_bench]
+  shipper:       [filesystem, message_bus, ci_cd, environments, feature_flags, monitoring, supplier_portals, logistics]
+  keeper:        [filesystem, memory, message_bus, monitoring, alerting, billing, inventory, web_search]
+  human:         [everything]
+
+bindings_example:   # how one runtime might bind the classes; replace with yours
+  web_search:   claude.web_search
+  web_fetch:    claude.web_fetch
+  tracker:      mcp.plane.workitem
+  sandbox:      bash_tool in a fresh container
+  repo:         git
+  ask_human:    ask_user_input
+  message_bus:  projects/<slug>/messages/*.json

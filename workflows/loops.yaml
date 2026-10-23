@@ -1,0 +1,52 @@
+# WCKD loops and re-entry. Phases are never skipped; they are re-entered through these paths.
+bpb:
+  name: Build -> Prove -> Break loop (per work order)
+  sequence: [builder, validator, breaker]
+  rules:
+    - a breach finding returns the work order to the builder (status building)
+    - after the fix, the validator retests (new proof), then the breaker confirms (retested_at)
+    - only the breaker closes a finding; builders may not set disposition
+    - a finding that cannot be fixed within the Bar is escalated for RE-JUDGE, not quietly accepted
+    - accepted findings need a signed acceptance with rationale and an expiry for re-review
+  exit: proof.result == PROVEN and breach.verdict == HARDENED
+  max_iterations_before_escalation: 3
+
+reentry:
+  RE_CANVASS:
+    who_may_request: any role
+    approves: conductor
+    triggers:
+      - a kept dependency is discontinued, relicensed or changes its interface
+      - a new candidate appears that could turn a BUILD into a KEEP or BEND
+      - a trial contradicts an appraiser score
+      - a breach finding reveals the landscape missed a failure mode (graveyard gap)
+    action: scout runs a scoped canvass for the affected capabilities; judge re-issues affected verdicts; new G-C and G-K records
+  RE_JUDGE:
+    who_may_request: [quartermaster, breaker, validator, prospector, conductor, human]
+    triggers:
+      - cost variance beyond the ledger's confidence class
+      - a CRIT breach finding that cannot be fixed within the Bar
+      - a failed proof that implicates the blueprint rather than the build
+      - a prospect tripwire or kill criterion fires
+    action: judge re-issues verdicts for affected capabilities; architect, quartermaster, prospector, planner update; new G-K record
+  RE_WANT:
+    who_may_request: [keeper, human]
+    triggers:
+      - the Bar is no longer met in operation for 2 consecutive review periods
+      - opex_actual exceeds opex_budget_monthly by more than 10% for 2 months
+      - the human's want has changed
+      - end_of_life reached
+    action: return to W with all existing artifacts as inputs; the existing build becomes a landscape candidate (source class c)
+  KILL:
+    who_may_request: [judge, human]
+    at: any gate, any time
+    action: scribe records reasons and the state of every artifact in memory; keeper executes exit plan from cost.exit; ledger row written
+
+escalation:
+  ladder: [agent, conductor, human]
+  format: schemas/message.schema.json with type escalation; both positions written; proposed decision; proposed_phase if re-entry
+  immediate_broadcast_to_human:
+    - any KILL recommendation
+    - any CRIT finding
+    - any cost variance beyond class
+    - any Bar change request

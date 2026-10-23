@@ -1,0 +1,196 @@
+# WCKD master workflow. Phases -> steps -> agents -> artifacts.
+# Artifact paths are relative to projects/<slug>/. Gate criteria live in gates.yaml; loops in loops.yaml.
+protocol: WCKD
+version: "1.0.0"
+pronounced: wicked
+prime_directive: >
+  We do not build what already works. We do not fix what is not broken.
+  We build only the gap between what exists and the Bar.
+
+conventions:
+  project_root: projects/<slug>/
+  message_schema: schemas/message.schema.json
+  every_agent_loads_first: [SOUL.md, GOALS.md, SKILLS.md]
+  evidence_required_on: every claim that crosses an agent boundary
+  human_veto_gates: [G-W, G-K, G-D4]
+
+roles:
+  spanning: [conductor, scribe]
+  W: [listener, barkeeper]
+  C: [scout, appraiser, cartographer]
+  K: [judge, architect, quartermaster, prospector, planner, breaker]   # breaker: pre-mortem only
+  D: [builder, validator, breaker, shipper, keeper]
+
+phases:
+  - id: W
+    name: Want
+    question: What do we want, to what standard?
+    entry: wish.json exists
+    steps:
+      - id: W1
+        name: wish-to-brief
+        agent: listener
+        skills: [wish-to-brief]
+        in: [wish.json, ../../memory/LESSONS.md]
+        out: [brief.json]            # all fields except bar and done_condition
+        notes: Ask at most five questions; only those that could change a verdict or the Bar.
+      - id: W2
+        name: set-the-bar
+        agent: barkeeper
+        skills: [bar-setting]
+        in: [brief.json, ../../memory/LESSONS.md]
+        out: [brief.json#bar]
+        notes: Threshold + measurement method per in-scope dimension. Flag thresholds unrealistic at the budget ceiling.
+      - id: W3
+        name: done-condition
+        agent: listener
+        skills: [done-condition-authoring]
+        in: [brief.json]
+        out: [brief.json#done_condition]
+    gate: G-W
+
+  - id: C
+    name: Canvass
+    question: What exists? What works? What died, and why?
+    entry: gates/G-W.json decision in [PASS, PASS_WITH_CONDITIONS]
+    time_box: 5-10% of brief.budget_ceiling.build; never zero
+    steps:
+      - id: C1
+        name: read-memory
+        agent: scout
+        skills: [landscape-search]
+        in: [../../memory/LESSONS.md, ../../memory/LEDGER.md]
+        out: [landscape.json#lessons_read]
+      - id: C2
+        name: search-and-try
+        agent: scout
+        skills: [landscape-search, candidate-trial, absence-proof, evidence-packaging]
+        in: [brief.json]
+        out: [landscape.json#search_log, landscape.json#candidates]
+        notes: ">=5 of 7 source classes per capability; try the top 2-3 candidates per capability."
+      - id: C3
+        name: appraise-and-bury
+        agent: appraiser
+        skills: [bar-scoring, failure-mining, evidence-packaging]
+        in: [brief.json#bar, landscape.json#candidates]
+        out: ["landscape.json#candidates[].fit", "landscape.json#candidates[].works", "landscape.json#candidates[].doesnt", landscape.json#graveyard]
+      - id: C4
+        name: map-coverage
+        agent: cartographer
+        skills: [gap-mapping, absence-proof]
+        in: [landscape.json]
+        out: [landscape.json#coverage, landscape.json#absence_declarations]
+    gate: G-C
+
+  - id: K
+    name: Keep / Kill
+    question: Per capability - keep, bend, build, wait or kill?
+    entry: gates/G-C.json decision in [PASS, PASS_WITH_CONDITIONS]
+    steps:
+      - id: K1
+        name: verdict
+        agent: judge
+        skills: [verdict-issuing]
+        in: [brief.json, landscape.json]
+        out: [verdict.json]
+        notes: BUILD requires why_not_keep and why_not_bend citing landscape ids. WAIT requires a tripwire.
+        on_overall_verdict:
+          KILL: { then: [S1], end: true }
+          WAIT: { then: [S1], sleep_until: verdict.tripwires }
+          PROCEED: { then: [K2, K3, K4] }
+      - id: K2
+        name: blueprint-the-gap
+        agent: architect
+        parallel_with: [K3, K4]
+        skills: [gap-architecture, interface-contracting]
+        in: [verdict.json, landscape.json, brief.json#bar]
+        out: [blueprint.json]
+        notes: Scope == BEND + BUILD set only.
+      - id: K3
+        name: price-it
+        agent: quartermaster
+        parallel_with: [K2, K4]
+        skills: [cost-ledgering, unit-costing]
+        in: [verdict.json, blueprint.json, "landscape.json#candidates[].cost"]
+        out: [cost.json]
+        notes: Build, run, exit, not-doing; unit for physical. Confidence class on everything.
+      - id: K4
+        name: prospect-it
+        agent: prospector
+        parallel_with: [K2, K3]
+        skills: [prospecting, risk-registering]
+        in: [brief.json, landscape.json, cost.json]
+        out: [prospect.json]
+      - id: K5
+        name: plan-and-premortem
+        agent: planner
+        after: [K2, K3, K4]
+        with: [breaker]
+        skills: [work-breakdown, crew-assignment, pre-mortem, risk-registering]
+        in: [blueprint.json, cost.json, prospect.json, landscape.json#graveyard]
+        out: [plan.json, workorders/WO-*.json]
+        notes: Every work order gets builder != validator != breaker.
+    gate: G-K
+
+  - id: D
+    name: Deliver
+    question: Build, prove, harden, ship, keep.
+    entry: gates/G-K.json decision in [PASS, PASS_WITH_CONDITIONS] and verdict.overall == PROCEED
+    steps:
+      - id: D1
+        name: build
+        agent: builder
+        per: workorder
+        skills: [increment-build, fabricate]
+        in: [workorders/WO-*.json, blueprint.json]
+        out: [deliverable, workorders/WO-*.json#build_log, workorders/WO-*.json#status=built]
+        gate: G-D1
+      - id: D2
+        name: prove
+        agent: validator
+        per: workorder
+        independence: validator != builder
+        skills: [test-authoring, clean-reproduction, acceptance-proof]
+        in: [workorders/WO-*.json, brief.json#bar, deliverable]
+        out: [proofs/WO-*.proof.json]
+        gate: G-D2
+      - id: D3
+        name: harden
+        agent: breaker
+        per: workorder_or_release
+        independence: breaker != builder and breaker != validator
+        skills: [security-attack, abuse-and-edge-attack, load-and-chaos, physical-stress, cost-attack]
+        in: [deliverable, blueprint.json, brief.json#bar, cost.json]
+        out: [breaches/BR-*.json]
+        loop: loops.yaml#bpb
+        gate: G-D3
+      - id: D4
+        name: ship
+        agent: shipper
+        skills: [rollout-design, rollback-drill, manufacturing-handoff]
+        in: [plan.json, blueprint.json, cost.json, breaches/]
+        out: [release.json]
+        requires_before_cutover: [release.rollback.drill_result == pass, runbook.json#slos, monitoring live]
+        gate: G-D4
+      - id: D5
+        name: keep
+        agent: keeper
+        skills: [runbook-authoring, slo-and-alerting, opex-tracking, drift-detection]
+        in: [release.json, cost.json, blueprint.json, brief.json#bar]
+        out: [runbook.json]
+      - id: S1
+        name: remember
+        agent: scribe
+        skills: [retro-and-lessons, ledger-writing]
+        in: [all project artifacts]
+        out: [lessons.md, ../../memory/LESSONS.md, ../../memory/LEDGER.md]
+        notes: ">=3 lessons, each citing the artifact that taught it. Goal scores G1-G12."
+    gate: G-D5
+
+operation:
+  owner: keeper
+  cadence:
+    slo_review: weekly
+    opex_record: monthly
+    drift_check: quarterly or on dependency change
+  reentry: loops.yaml#reentry

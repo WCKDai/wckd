@@ -1,0 +1,139 @@
+# WCKD gates. The Conductor (and bin/wckd.py) refuse a gate when a required artifact is missing or
+# invalid, when a criterion lacks evidence, or when a human-veto gate has no human sign-off.
+# Gate records are written to projects/<slug>/gates/<id>.json (schemas/gate.schema.json).
+order: [G-W, G-C, G-K, G-D1, G-D2, G-D3, G-D4, G-D5]
+
+gates:
+  - id: G-W
+    name: Briefed
+    phase: W
+    requires: [brief.json]
+    criteria:
+      - every capability has a measurable statement and a priority (must/should/could)
+      - every in-scope Bar dimension has a threshold and a measurement method
+      - done_condition.test could be run by a stranger
+      - budget ceiling (build, run_monthly, unit if physical) and horizon are present
+      - memory was consulted (brief.lessons_read non-empty)
+      - questions asked are recorded verbatim with answers
+    signoff: [listener, barkeeper]
+    human_signoff: true
+    on_fail: return to W1
+
+  - id: G-C
+    name: Canvassed
+    phase: C
+    requires: [landscape.json]
+    criteria:
+      - at least 5 of 7 source classes searched per capability (search_log)
+      - at least 3 candidates evaluated per capability, or an absence_declaration citing the search log
+      - top candidates were tried (candidates[].tried true) where feasible; otherwise trial_notes say why not
+      - every candidate has works[], doesnt[], fit[] with Bar references and evidence
+      - graveyard is non-empty, or an explicit note that the space has no history
+      - every coverage row names a best_fit or a precise gap (dimension and magnitude)
+      - every candidate has checked_at within brief.freshness_days
+      - lessons_read is non-empty
+    signoff: [scout, appraiser, cartographer]
+    human_signoff: false
+    on_fail: return to C2 with the missing source classes or capabilities named
+
+  - id: G-K
+    name: Judged
+    phase: K
+    requires: [verdict.json, blueprint.json, cost.json, prospect.json, plan.json]
+    requires_if_proceed: [workorders/]
+    criteria:
+      - every capability in the brief has a verdict
+      - every BUILD has why_not_keep and why_not_bend citing landscape candidate ids
+      - every WAIT has a tripwire with condition and date
+      - blueprint.scope equals the BEND + BUILD set and nothing else
+      - every blueprint component has interfaces to its kept dependencies, by locator and version
+      - cost.json has build, run_monthly, exit, not_doing (and unit for physical) with a confidence class; totals at 1, 12, 36 months
+      - cost totals are within brief.budget_ceiling, or a signed bar_change / ceiling_change is recorded
+      - prospect.json has kill_criteria and tripwires
+      - plan.premortem names at least 3 failure modes with mitigations, citing graveyard or risks
+      - every work order has builder != validator != breaker
+      - reuse ratio is reported
+      - overall verdict is PROCEED (KILL and WAIT end or sleep the project here, after S1)
+    signoff: [judge, architect, quartermaster, prospector, planner]
+    human_signoff: true
+    on_fail: return to K1, or RE-CANVASS if the failure is a landscape gap
+
+  - id: G-D1
+    name: Built
+    phase: D
+    requires: [workorders/]
+    criteria:
+      - every work order in plan.work_orders has status built or later
+      - every work order has a build_log with evidence
+      - no work order status was set to proven by its builder
+      - as-built deviations from the blueprint are recorded as messages to the architect
+    signoff: [builder]
+    human_signoff: false
+    on_fail: work orders returned to builder
+
+  - id: G-D2
+    name: Proven
+    phase: D
+    requires: [workorders/, proofs/]
+    criteria:
+      - every work order has a proof with result PROVEN
+      - every proof carries independence_attestation true and validator != builder
+      - every proof has reproduced_from_clean true, or a reason and a conditions entry
+      - every test names a Bar dimension and records expected vs observed
+    signoff: [validator]
+    human_signoff: false
+    on_fail: failed work orders return to builder (loops.yaml#bpb)
+
+  - id: G-D3
+    name: Hardened
+    phase: D
+    requires: [breaches/]
+    criteria:
+      - at least one breach record covers every work order or the integrated release
+      - zero findings with severity crit or high in disposition open
+      - every accepted finding has a signed acceptance with rationale
+      - every fixed finding has retested_at set by the breaker
+      - a cost-attack campaign was run and compared to cost.run_monthly
+      - physical work orders have a physical-stress campaign
+    signoff: [breaker]
+    human_signoff: false
+    on_fail: findings return to builder; loop until hardened
+
+  - id: G-D4
+    name: Shipped
+    phase: D
+    requires: [release.json, runbook.json]
+    criteria:
+      - release strategy chosen and steps written with go/no-go criteria
+      - rollback drill executed with drill_result pass and a measured time; for physical, repair or recall path rehearsed on real units
+      - monitoring live before cutover (runbook.slos and alerts exist and are wired)
+      - all breach findings dispositioned
+      - cost re-estimated at this gate; variance within class or escalated
+      - go/no-go signed by shipper, keeper and the human
+    signoff: [shipper, keeper]
+    human_signoff: true
+    on_fail: hold release; return to D3 or D4
+
+  - id: G-D5
+    name: Kept
+    phase: D
+    requires: [runbook.json, lessons.md]
+    criteria:
+      - runbook has a named owner (a person or a rota, never "the team")
+      - every SLO has a measurement and an alert with an owner
+      - maintenance cadence, spares/consumables, patching policy and end_of_life exist
+      - opex_budget_monthly set from cost.json; opex_actual recording started
+      - reentry_triggers exist for RE_WANT, RE_CANVASS and RE_JUDGE conditions
+      - lessons.md has at least 3 lessons, each citing an artifact; appended to memory/LESSONS.md
+      - memory/LEDGER.md row written with goal scores G1-G12
+    signoff: [keeper, scribe, conductor]
+    human_signoff: false
+    on_fail: return to D5
+
+decisions: [PASS, FAIL, PASS_WITH_CONDITIONS]
+pass_with_conditions:
+  rule: every condition names an owner and a due gate; an open condition blocks that due gate.
+kill:
+  available_at: any gate, any time
+  by: [judge, human]
+  then: S1 (scribe records reasons to memory)

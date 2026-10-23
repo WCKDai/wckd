@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/plan.schema.json",
+  "title": "Plan",
+  "description": "Work breakdown, milestones, critical path, crews, pre-mortem. Output of K5.",
+  "type": "object",
+  "required": ["id", "blueprint_id", "milestones", "work_orders", "critical_path", "crews", "premortem", "schedule_confidence", "provenance"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "blueprint_id": { "$ref": "common.schema.json#/$defs/id" },
+    "milestones": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["id", "name", "exit_criteria", "due"], "properties": { "id": { "$ref": "common.schema.json#/$defs/id" }, "name": { "type": "string" }, "exit_criteria": { "type": "array", "items": { "type": "string" } }, "due": { "type": "string", "description": "date or relative" }, "work_orders": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } } } } },
+    "work_orders": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "long_lead_items": { "type": "array", "items": { "type": "object", "required": ["item", "lead_time", "order_by"], "properties": { "item": { "type": "string" }, "lead_time": { "type": "string" }, "order_by": { "$ref": "common.schema.json#/$defs/date" }, "work_order": { "$ref": "common.schema.json#/$defs/id" } } } },
+    "critical_path": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "crews": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["work_order", "builder", "validator", "breaker"],
+        "properties": { "work_order": { "$ref": "common.schema.json#/$defs/id" }, "builder": { "type": "string" }, "validator": { "type": "string" }, "breaker": { "type": "string" } },
+        "additionalProperties": false
+      },
+      "description": "builder, validator and breaker must be three different identities per work order"
+    },
+    "premortem": { "type": "object", "required": ["run_at", "with", "failures"], "properties": { "run_at": { "$ref": "common.schema.json#/$defs/timestamp" }, "with": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/role" } }, "failures": { "type": "array", "minItems": 3, "items": { "type": "object", "required": ["story", "mitigation_or_tripwire"], "properties": { "story": { "type": "string" }, "cites": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" }, "description": "grave or risk ids" }, "mitigation_or_tripwire": { "type": "string" } } } } } },
+    "risks_carried": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "schedule_confidence": { "$ref": "common.schema.json#/$defs/confidence" },
+    "signoffs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/signoff" } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}

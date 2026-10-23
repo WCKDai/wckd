@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/blueprint.schema.json",
+  "title": "Blueprint",
+  "description": "Architecture of the BEND + BUILD set only. Output of K2.",
+  "type": "object",
+  "required": ["id", "verdict_id", "scope", "components", "adrs", "reversibility_plan", "non_goals", "open_risks", "provenance"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "verdict_id": { "$ref": "common.schema.json#/$defs/id" },
+    "scope": { "type": "object", "required": ["build", "bend"], "properties": { "build": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } }, "bend": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } } }, "description": "capability ids; nothing with verdict KEEP may appear" },
+    "components": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "realm", "responsibility", "serves", "kept_dependencies", "interfaces"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "type": "string" },
+          "realm": { "$ref": "common.schema.json#/$defs/realm" },
+          "responsibility": { "type": "string" },
+          "serves": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/id" }, "description": "capability ids" },
+          "kept_dependencies": { "type": "array", "items": { "type": "object", "required": ["candidate_id", "version"], "properties": { "candidate_id": { "$ref": "common.schema.json#/$defs/id" }, "version": { "type": "string" }, "exit_cost_note": { "type": "string" } } } },
+          "interfaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["with", "contract", "failure_behavior", "versioning", "documented_at"],
+              "properties": {
+                "with": { "type": "string", "description": "component id or kept candidate id" },
+                "contract": { "type": "string", "description": "protocol or connector; schema or tolerance" },
+                "failure_behavior": { "type": "string" },
+                "versioning": { "type": "string" },
+                "documented_at": { "type": "string", "description": "locator of the other side's documented interface" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "data_flows": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "physical_spec": { "type": "object", "properties": { "envelope": { "type": "string" }, "power_budget": { "type": "string" }, "materials": { "type": "array", "items": { "type": "string" } }, "environment": { "type": "string" }, "certification_targets": { "type": "array", "items": { "type": "string" } }, "serviceability": { "type": "string" } } },
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "decision", "options", "chosen", "consequences", "reversible"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "decision": { "type": "string" },
+          "options": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+          "chosen": { "type": "string" },
+          "consequences": { "type": "string" },
+          "reversible": { "type": "boolean" },
+          "ceremony": { "type": "string", "description": "required when reversible is false: drill, signature, owner" },
+          "evidence": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence" } }
+        },
+        "if": { "properties": { "reversible": { "const": false } } }, "then": { "required": ["ceremony"] },
+        "additionalProperties": false
+      }
+    },
+    "reversibility_plan": { "type": "array", "items": { "type": "object", "required": ["component_id", "how_to_back_out"], "properties": { "component_id": { "$ref": "common.schema.json#/$defs/id" }, "how_to_back_out": { "type": "string" }, "cost_note": { "type": "string" } } } },
+    "non_goals": { "type": "array", "items": { "type": "string" } },
+    "open_risks": { "type": "array", "items": { "type": "string" } },
+    "graves_considered": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "signoffs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/signoff" } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}

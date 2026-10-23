@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/break.schema.json",
+  "title": "Breach report",
+  "description": "Adversarial campaigns, findings and dispositions for a work order or the integrated release. Output of D3.",
+  "type": "object",
+  "required": ["id", "target", "breaker", "independence_attestation", "campaigns", "findings", "verdict", "provenance"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "target": { "type": "object", "required": ["kind", "ref"], "properties": { "kind": { "type": "string", "enum": ["workorder", "release"] }, "ref": { "$ref": "common.schema.json#/$defs/id" } } },
+    "breaker": { "type": "string" },
+    "independence_attestation": { "type": "object", "required": ["independent", "note"], "properties": { "independent": { "type": "boolean" }, "note": { "type": "string" } } },
+    "campaigns": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["category", "ran", "method", "outcome"],
+        "properties": {
+          "category": { "type": "string", "enum": ["security", "abuse", "edge", "load", "chaos", "physical", "supply_chain", "cost", "privacy", "safety"] },
+          "ran": { "type": "boolean" },
+          "why_not": { "type": "string" },
+          "method": { "type": "string" },
+          "duration": { "type": "string" },
+          "pushed_past_threshold": { "type": "string", "description": "which Bar threshold, by how much" },
+          "outcome": { "type": "string" },
+          "evidence": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "severity", "category", "repro", "blast_radius", "disposition", "evidence"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "title": { "type": "string" },
+          "severity": { "$ref": "common.schema.json#/$defs/severity" },
+          "category": { "type": "string", "enum": ["security", "abuse", "edge", "load", "chaos", "physical", "supply_chain", "cost", "privacy", "safety"] },
+          "repro": { "type": "string" },
+          "blast_radius": { "type": "string" },
+          "recovery_observed": { "type": "string" },
+          "cost_delta": { "$ref": "common.schema.json#/$defs/money" },
+          "disposition": { "type": "string", "enum": ["open", "fixed", "accepted", "wontfix"] },
+          "acceptance": { "type": "object", "required": ["rationale", "signoffs", "expires"], "properties": { "rationale": { "type": "string" }, "signoffs": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/signoff" } }, "expires": { "$ref": "common.schema.json#/$defs/date" } } },
+          "fixed_in": { "type": "string" },
+          "retested_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+          "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/evidence" } }
+        },
+        "allOf": [
+          { "if": { "properties": { "disposition": { "const": "fixed" } } }, "then": { "required": ["retested_at"] } },
+          { "if": { "properties": { "disposition": { "const": "accepted" } } }, "then": { "required": ["acceptance"] } }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "cost_compared_to_ledger": { "type": "string" },
+    "verdict": { "type": "string", "enum": ["HARDENED", "NOT_HARDENED"] },
+    "signoffs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/signoff" } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,123 @@
+{
+  "id": "aqm-landscape",
+  "brief_id": "aqm-brief",
+  "time_box": "1 day (about 10% of the 200 USD build ceiling in time); samples ordered day 1",
+  "lessons_read": ["memory/LESSONS.md#protocol", "memory/LESSONS.md#physical-hardware", "memory/LEDGER.md (no prior air-quality project)"],
+  "not_checked": ["commercial monitors above 150 USD (over cost_unit ceiling)", "LoRa / non-Wi-Fi radios (no gateway in the home)"],
+  "search_log": [
+    { "capability_id": "C1", "source_class": "physical_supplier", "query": "PM2.5 laser sensor module", "tool": "supplier_catalogs", "at": "2026-10-23T12:00:00Z", "results_count": 14, "kept": ["cand-pm"] },
+    { "capability_id": "C1", "source_class": "open_source", "query": "esphome pm2.5 sensor component", "tool": "web_search", "at": "2026-10-23T12:05:00Z", "results_count": 9, "kept": ["cand-esphome"] },
+    { "capability_id": "C1", "source_class": "commercial_cots", "query": "indoor air quality monitor app pm2.5 co2", "tool": "web_search", "at": "2026-10-23T12:10:00Z", "results_count": 22, "kept": ["cand-consumer"] },
+    { "capability_id": "C1", "source_class": "community_issue_tracker", "query": "pm2.5 sensor drift fan dust issue", "tool": "repo_search", "at": "2026-10-23T12:20:00Z", "results_count": 31 },
+    { "capability_id": "C1", "source_class": "academic_patent_standard", "query": "low-cost PM2.5 sensor evaluation accuracy", "tool": "web_search", "at": "2026-10-23T12:25:00Z", "results_count": 12 },
+    { "capability_id": "C1", "source_class": "internal_prior", "query": "air quality", "tool": "memory", "at": "2026-10-23T12:00:00Z", "results_count": 0 },
+    { "capability_id": "C2", "source_class": "physical_supplier", "query": "NDIR CO2 sensor module i2c", "tool": "supplier_catalogs", "at": "2026-10-23T12:30:00Z", "results_count": 11, "kept": ["cand-co2"] },
+    { "capability_id": "C2", "source_class": "open_source", "query": "esphome co2 ndir component", "tool": "web_search", "at": "2026-10-23T12:32:00Z", "results_count": 7, "kept": ["cand-esphome"] },
+    { "capability_id": "C2", "source_class": "community_issue_tracker", "query": "ndir co2 sensor calibration drift", "tool": "repo_search", "at": "2026-10-23T12:35:00Z", "results_count": 18 },
+    { "capability_id": "C2", "source_class": "academic_patent_standard", "query": "NDIR CO2 sensor automatic baseline calibration", "tool": "web_search", "at": "2026-10-23T12:38:00Z", "results_count": 9 },
+    { "capability_id": "C2", "source_class": "commercial_cots", "query": "co2 monitor app notifications", "tool": "web_search", "at": "2026-10-23T12:40:00Z", "results_count": 16, "kept": ["cand-consumer"] },
+    { "capability_id": "C3", "source_class": "open_source", "query": "home automation platform mobile notifications local", "tool": "web_search", "at": "2026-10-23T13:00:00Z", "results_count": 10, "kept": ["cand-ha"] },
+    { "capability_id": "C3", "source_class": "commercial_cots", "query": "air quality monitor push notification threshold", "tool": "web_search", "at": "2026-10-23T13:05:00Z", "results_count": 14, "kept": ["cand-consumer"] },
+    { "capability_id": "C3", "source_class": "community_issue_tracker", "query": "companion app notification delay issue", "tool": "repo_search", "at": "2026-10-23T13:10:00Z", "results_count": 25 },
+    { "capability_id": "C3", "source_class": "adjacent_domain", "query": "self-hosted push notification service", "tool": "web_search", "at": "2026-10-23T13:15:00Z", "results_count": 8 },
+    { "capability_id": "C3", "source_class": "internal_prior", "query": "notification", "tool": "memory", "at": "2026-10-23T13:00:00Z", "results_count": 0 },
+    { "capability_id": "C4", "source_class": "open_source", "query": "home automation history recorder long term statistics", "tool": "web_search", "at": "2026-10-23T13:30:00Z", "results_count": 9, "kept": ["cand-ha"] },
+    { "capability_id": "C4", "source_class": "commercial_cots", "query": "air quality app 30 day history subscription", "tool": "web_search", "at": "2026-10-23T13:35:00Z", "results_count": 12, "kept": ["cand-consumer"] },
+    { "capability_id": "C4", "source_class": "community_issue_tracker", "query": "recorder database growth sd card wear", "tool": "repo_search", "at": "2026-10-23T13:40:00Z", "results_count": 20 },
+    { "capability_id": "C4", "source_class": "adjacent_domain", "query": "time series database small footprint", "tool": "web_search", "at": "2026-10-23T13:45:00Z", "results_count": 15 },
+    { "capability_id": "C4", "source_class": "internal_prior", "query": "history dashboard", "tool": "memory", "at": "2026-10-23T13:30:00Z", "results_count": 0 },
+    { "capability_id": "C5", "source_class": "community_issue_tracker", "query": "esp32 sensor wifi reconnect watchdog abandoned", "tool": "repo_search", "at": "2026-10-23T14:00:00Z", "results_count": 40 },
+    { "capability_id": "C5", "source_class": "open_source", "query": "esphome ota watchdog reboot on wifi loss", "tool": "web_search", "at": "2026-10-23T14:05:00Z", "results_count": 6, "kept": ["cand-esphome"] },
+    { "capability_id": "C5", "source_class": "physical_supplier", "query": "sensor enclosure vented abs", "tool": "supplier_catalogs", "at": "2026-10-23T14:10:00Z", "results_count": 30 },
+    { "capability_id": "C5", "source_class": "commercial_cots", "query": "air quality monitor reliability review one year", "tool": "web_search", "at": "2026-10-23T14:15:00Z", "results_count": 11 },
+    { "capability_id": "C5", "source_class": "academic_patent_standard", "query": "low-cost sensor network uptime field study", "tool": "web_search", "at": "2026-10-23T14:20:00Z", "results_count": 7 },
+    { "capability_id": "C6", "source_class": "open_source", "query": "home automation monthly report email summary", "tool": "web_search", "at": "2026-10-23T14:30:00Z", "results_count": 5 },
+    { "capability_id": "C6", "source_class": "commercial_cots", "query": "air quality monthly report email app", "tool": "web_search", "at": "2026-10-23T14:33:00Z", "results_count": 9, "kept": ["cand-consumer"] },
+    { "capability_id": "C6", "source_class": "community_issue_tracker", "query": "scheduled summary notification automation blueprint", "tool": "repo_search", "at": "2026-10-23T14:36:00Z", "results_count": 12 },
+    { "capability_id": "C6", "source_class": "adjacent_domain", "query": "scheduled report generator self-hosted", "tool": "web_search", "at": "2026-10-23T14:40:00Z", "results_count": 10 },
+    { "capability_id": "C6", "source_class": "internal_prior", "query": "monthly report", "tool": "memory", "at": "2026-10-23T14:30:00Z", "results_count": 0 }
+  ],
+  "candidates": [
+    {
+      "id": "cand-ha", "name": "Home Assistant (open-source home automation platform)", "kind": "open_source", "locator": "https://www.home-assistant.io/", "version": "current stable at check time - verify", "maturity": "mature", "license": "Apache-2.0",
+      "cost": { "keep": { "amount": 0, "currency": "USD", "confidence_class": "definitive", "basis": "open source" }, "run_monthly": { "amount": 0.9, "currency": "USD", "confidence_class": "budgetary", "basis": "~3 W single-board computer at 0.40 USD/kWh" }, "exit": { "amount": 0, "currency": "USD", "confidence_class": "rom", "basis": "export history as CSV" } },
+      "checked_at": "2026-10-23T15:00:00Z", "tried": true,
+      "trial_notes": "Installed on a spare single-board computer; companion app installed on phone; test notification arrived in under 5 s on the local network; recorder kept 10 days of test data by default and is configurable.",
+      "works": ["phone notifications via companion app (measured < 5 s on LAN)", "history and long-term statistics built in", "runs fully local; no cloud account required", "ESPHome devices auto-discovered"],
+      "doesnt": ["no built-in periodic narrative report (C6)", "needs a host computer running 24/7 (adds ~3 W and a device to keep)"],
+      "fit": [
+        { "capability_id": "C3", "score": 0.95, "meets_bar": true, "per_dimension": [ { "name": "security", "meets": true, "note": "local only", "grade": "tried" }, { "name": "usability", "meets": true, "note": "threshold set in app UI", "grade": "tried" } ] },
+        { "capability_id": "C4", "score": 0.95, "meets_bar": true, "per_dimension": [ { "name": "reliability", "meets": true, "note": "retention configurable to 30+ days", "grade": "tried" } ] },
+        { "capability_id": "C6", "score": 0.4, "meets_bar": false, "notes": "can send a message on a schedule, but assembling trends plus calibration status is new logic" }
+      ],
+      "evidence": [ { "kind": "log", "locator": "canvass/ha-trial.log", "summary": "install, notification timing, recorder config", "captured_at": "2026-10-23T15:00:00Z", "captured_by": "scout", "confidence": 0.9, "grade": "tried" } ]
+    },
+    {
+      "id": "cand-esphome", "name": "ESPHome (open-source firmware framework for ESP32-class boards)", "kind": "open_source", "locator": "https://esphome.io/", "version": "current stable at check time - verify", "maturity": "mature", "license": "MIT/GPL mix - verify per component",
+      "cost": { "keep": { "amount": 0, "currency": "USD", "confidence_class": "definitive", "basis": "open source" } },
+      "checked_at": "2026-10-23T15:30:00Z", "tried": true,
+      "trial_notes": "Flashed a dev board with the PM and CO2 components; readings appeared in Home Assistant within minutes; OTA update worked; Wi-Fi reconnect behaviour exists but needed configuring.",
+      "works": ["components for PMS-class PM sensors and SCD-class CO2 sensors", "OTA updates", "native Home Assistant integration"],
+      "doesnt": ["no enclosure, calibration schedule or hardware watchdog out of the box", "defaults need hardening for a 12-month unattended run"],
+      "fit": [
+        { "capability_id": "C1", "score": 0.9, "meets_bar": true },
+        { "capability_id": "C2", "score": 0.9, "meets_bar": true },
+        { "capability_id": "C5", "score": 0.7, "meets_bar": false, "per_dimension": [ { "name": "reliability", "meets": false, "note": "reconnect and calibration need configuration; enclosure needed", "grade": "tried" } ] }
+      ],
+      "evidence": [ { "kind": "log", "locator": "canvass/esphome-trial.log", "summary": "flash, readings, OTA", "captured_at": "2026-10-23T15:30:00Z", "captured_by": "scout", "confidence": 0.9, "grade": "tried" } ]
+    },
+    {
+      "id": "cand-pm", "name": "Laser PM2.5 sensor module (PMS5003-class)", "kind": "physical_supplier", "locator": "distributor catalog - part class, several suppliers", "version": "n/a", "maturity": "mature",
+      "cost": { "unit": { "amount": 18, "currency": "USD", "confidence_class": "budgetary", "basis": "catalog price at qty 1-10, 2026-10-23" }, "moq": 1, "lead_time": "3-7 days" },
+      "checked_at": "2026-10-23T16:00:00Z", "tried": true,
+      "trial_notes": "Sample ordered day 1; bench run 6 h beside a reference monitor; within 15% after warm-up.",
+      "works": ["within Bar accuracy in bench run (measured)", "widely supported, cheap, replaceable"],
+      "doesnt": ["fan draws dust; lifetime quoted in years but drift reported", "needs 5 V supply"],
+      "fit": [ { "capability_id": "C1", "score": 0.9, "meets_bar": true, "per_dimension": [ { "name": "correctness", "meets": true, "note": "15% vs reference over 6 h", "grade": "measured" } ] } ],
+      "evidence": [ { "kind": "measurement", "locator": "canvass/pm-bench.csv", "summary": "6 h side-by-side", "captured_at": "2026-10-23T16:00:00Z", "captured_by": "scout", "confidence": 0.85, "grade": "measured" } ]
+    },
+    {
+      "id": "cand-co2", "name": "NDIR CO2 sensor module (SCD40-class)", "kind": "physical_supplier", "locator": "distributor catalog - part class, several suppliers", "version": "n/a", "maturity": "mature",
+      "cost": { "unit": { "amount": 25, "currency": "USD", "confidence_class": "budgetary", "basis": "catalog price at qty 1-10, 2026-10-23" }, "moq": 1, "lead_time": "3-7 days" },
+      "checked_at": "2026-10-23T16:00:00Z", "tried": true,
+      "trial_notes": "Sample bench run; fresh-air reading ~430 ppm; tracks a reference within 60 ppm.",
+      "works": ["within Bar accuracy (measured)", "I2C, low power"],
+      "doesnt": ["automatic baseline calibration assumes weekly fresh-air exposure; needs a calibration routine"],
+      "fit": [ { "capability_id": "C2", "score": 0.9, "meets_bar": true, "per_dimension": [ { "name": "correctness", "meets": true, "note": "60 ppm vs reference", "grade": "measured" } ] } ],
+      "evidence": [ { "kind": "measurement", "locator": "canvass/co2-bench.csv", "summary": "bench run vs reference", "captured_at": "2026-10-23T16:00:00Z", "captured_by": "scout", "confidence": 0.85, "grade": "measured" } ]
+    },
+    {
+      "id": "cand-consumer", "name": "Consumer all-in-one monitor with cloud app (representative of several products)", "kind": "commercial_cots", "locator": "several retail listings; see search_log", "version": "n/a", "maturity": "stable",
+      "cost": { "unit": { "amount": 180, "currency": "USD", "confidence_class": "budgetary", "basis": "typical retail, 2026-10-23" }, "run_monthly": { "amount": 4, "currency": "USD", "confidence_class": "rom", "basis": "history beyond a few days typically behind a subscription" } },
+      "checked_at": "2026-10-23T16:30:00Z", "tried": false,
+      "trial_notes": "Not ordered: over the cost_unit ceiling; assessed from documentation and reviews only.",
+      "works": ["good enough accuracy per reviews", "polished app with notifications"],
+      "doesnt": ["readings go to vendor cloud (fails security threshold)", "over cost_unit and cost_run ceilings", "history behind subscription"],
+      "fit": [
+        { "capability_id": "C1", "score": 0.7, "meets_bar": false, "notes": "cost_unit and security" },
+        { "capability_id": "C3", "score": 0.8, "meets_bar": false, "notes": "security: cloud path" },
+        { "capability_id": "C4", "score": 0.6, "meets_bar": false, "notes": "cost_run" },
+        { "capability_id": "C6", "score": 0.5, "meets_bar": false, "notes": "some vendors email summaries; cloud and cost fail the Bar" }
+      ],
+      "conflicts": ["reviews disagree on long-term accuracy; not resolvable without a trial"],
+      "evidence": [ { "kind": "url", "locator": "see search_log entries for commercial_cots", "summary": "documentation and reviews", "captured_at": "2026-10-23T16:30:00Z", "captured_by": "appraiser", "confidence": 0.6, "grade": "found" } ]
+    }
+  ],
+  "graveyard": [
+    { "id": "grave-drift", "name": "DIY ESP sensor projects abandoned after months", "what_it_tried": "bare sensor on a dev board, no enclosure, no calibration", "why_it_died": "readings drifted; fans clogged with dust; owners lost trust and unplugged them", "lesson": "plan the calibration routine and a cleanable, replaceable sensor from day one", "capability_ids": ["C1", "C2", "C5"], "evidence": [ { "kind": "url", "locator": "community threads found via search_log C5 (40 results)", "summary": "pattern across many abandoned repos and threads", "captured_at": "2026-10-23T14:00:00Z", "captured_by": "appraiser", "confidence": 0.8, "grade": "found" } ] },
+    { "id": "grave-cloud", "name": "Consumer monitors whose cloud service was discontinued", "what_it_tried": "vendor cloud for history and alerts", "why_it_died": "service shut down or moved behind a subscription; history lost; alerts stopped", "lesson": "keep readings and alerts local; cloud only as an opt-in mirror", "capability_ids": ["C3", "C4"], "evidence": [ { "kind": "url", "locator": "reviews and announcements found via search_log C4/C5 commercial_cots", "summary": "several discontinued-service reports", "captured_at": "2026-10-23T14:15:00Z", "captured_by": "appraiser", "confidence": 0.75, "grade": "found" } ] },
+    { "id": "grave-reconnect", "name": "Wi-Fi sensors that silently stopped reporting", "what_it_tried": "default Wi-Fi settings, no watchdog, battery power", "why_it_died": "router reboot or brown-out left the device stuck; nobody noticed for weeks", "lesson": "mains power, hardware watchdog, reboot-on-disconnect, and an alert when readings stop", "capability_ids": ["C5"], "evidence": [ { "kind": "url", "locator": "issue tracker results via search_log C5 community_issue_tracker", "summary": "recurring reconnect issues", "captured_at": "2026-10-23T14:00:00Z", "captured_by": "appraiser", "confidence": 0.85, "grade": "found" } ] }
+  ],
+  "coverage": [
+    { "capability_id": "C1", "source_classes_searched": ["physical_supplier", "open_source", "commercial_cots", "community_issue_tracker", "academic_patent_standard", "internal_prior"], "candidates_evaluated": ["cand-pm", "cand-esphome", "cand-consumer"], "best_fit": { "candidate_id": "cand-pm", "score": 0.9 }, "gap": "", "graves": ["grave-drift"] },
+    { "capability_id": "C2", "source_classes_searched": ["physical_supplier", "open_source", "community_issue_tracker", "academic_patent_standard", "commercial_cots"], "candidates_evaluated": ["cand-co2", "cand-esphome", "cand-consumer"], "best_fit": { "candidate_id": "cand-co2", "score": 0.9 }, "gap": "", "graves": ["grave-drift"] },
+    { "capability_id": "C3", "source_classes_searched": ["open_source", "commercial_cots", "community_issue_tracker", "adjacent_domain", "internal_prior"], "candidates_evaluated": ["cand-ha", "cand-consumer"], "best_fit": { "candidate_id": "cand-ha", "score": 0.95 }, "gap": "", "graves": ["grave-cloud"] },
+    { "capability_id": "C4", "source_classes_searched": ["open_source", "commercial_cots", "community_issue_tracker", "adjacent_domain", "internal_prior"], "candidates_evaluated": ["cand-ha", "cand-consumer"], "best_fit": { "candidate_id": "cand-ha", "score": 0.95 }, "gap": "", "graves": ["grave-cloud"] },
+    { "capability_id": "C5", "source_classes_searched": ["community_issue_tracker", "open_source", "physical_supplier", "commercial_cots", "academic_patent_standard"], "candidates_evaluated": ["cand-esphome", "cand-consumer"], "best_fit": { "candidate_id": "cand-esphome", "score": 0.7 }, "gap": "reliability: reconnect, watchdog, calibration schedule and enclosure missing; closable by configuration plus a small physical build", "graves": ["grave-drift", "grave-reconnect"] },
+    { "capability_id": "C6", "source_classes_searched": ["open_source", "commercial_cots", "community_issue_tracker", "adjacent_domain", "internal_prior"], "candidates_evaluated": ["cand-ha", "cand-consumer"], "best_fit": { "candidate_id": "cand-ha", "score": 0.4 }, "gap": "usability/correctness: no candidate assembles a monthly narrative with calibration status; new logic required (small)", "graves": [] }
+  ],
+  "absence_declarations": [],
+  "summary": "Four of six capabilities are fully covered by mature open-source software plus two commodity sensor modules, all tried on the bench. C5 (12-month unattended) is nearly covered by ESPHome and needs configuration plus an enclosure and calibration routine - the Graveyard says this is where DIY builds die. C6 (monthly narrative report) has no candidate above 0.4. The consumer all-in-one fails the Bar on cost and privacy. Three graves: drift, cloud shutdowns, silent reconnect failures.",
+  "signoffs": [ { "by": "cartographer", "role": "cartographer", "at": "2026-10-23T17:00:00Z", "decision": "approve" } ],
+  "provenance": { "produced_by": "cartographer", "produced_at": "2026-10-23T17:00:00Z", "inputs": [ { "artifact": "brief", "path": "brief.json" } ] }
+}

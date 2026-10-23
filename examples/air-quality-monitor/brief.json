@@ -1,0 +1,61 @@
+{
+  "id": "aqm-brief",
+  "wish": "A home air-quality monitor that alerts my phone",
+  "restated": "Know when the air in one room at home is bad (particulates or CO2), be told on my phone within a minute, see how it has been, and have it keep working for years without babysitting.",
+  "realm": "hybrid",
+  "freshness_days": 90,
+  "capabilities": [
+    { "id": "C1", "statement": "A person can see the room's PM2.5 level, updated at least every 60 s, accurate to within 20% of a reference monitor", "priority": "must", "measurable": true, "measure": "side-by-side with a reference monitor for 24 h", "confidence": 0.9 },
+    { "id": "C2", "statement": "A person can see the room's CO2 level, updated at least every 60 s, accurate to within 10% or 100 ppm", "priority": "must", "measurable": true, "measure": "side-by-side with a reference NDIR monitor; fresh-air check at ~420 ppm", "confidence": 0.9 },
+    { "id": "C3", "statement": "A person receives a phone notification within 60 s of PM2.5 or CO2 crossing a threshold they set", "priority": "must", "measurable": true, "measure": "stopwatch from induced crossing to notification", "confidence": 0.95 },
+    { "id": "C4", "statement": "A person can view 30 days of history for both readings on their phone", "priority": "should", "measurable": true, "measure": "open history view on day 31; 30 days present", "confidence": 0.8 },
+    { "id": "C5", "statement": "The monitor keeps measuring and alerting for 12 months with no manual intervention beyond a yearly check", "priority": "must", "measurable": true, "measure": "uptime log; count of manual interventions", "confidence": 0.7 },
+    { "id": "C6", "statement": "A person receives a monthly plain-language summary of trends and the sensor's calibration status", "priority": "could", "measurable": true, "measure": "summary arrives on the 1st; contains trend and calibration lines", "confidence": 0.6 }
+  ],
+  "constraints": [
+    { "kind": "place", "statement": "one room, mains power available, home Wi-Fi" },
+    { "kind": "existing_system", "statement": "a smartphone; no existing home-automation system" },
+    { "kind": "people", "statement": "one non-specialist operator" }
+  ],
+  "non_goals": ["outdoor air", "lab-grade VOC measurement", "more than one home"],
+  "stakeholders": ["the household"],
+  "horizon": { "first_value": "2 weeks", "lifetime": "3 years" },
+  "budget_ceiling": {
+    "build": { "amount": 200, "currency": "USD", "confidence_class": "rom", "basis": "human's stated ceiling" },
+    "run_monthly": { "amount": 3, "currency": "USD", "confidence_class": "rom", "basis": "human's stated ceiling" },
+    "unit": { "amount": 150, "currency": "USD", "confidence_class": "rom", "basis": "human's stated ceiling" }
+  },
+  "bar": {
+    "in_scope": ["correctness", "reliability", "security", "cost_build", "cost_run", "cost_unit", "usability", "maintainability", "sustainability"],
+    "dimensions": [
+      { "name": "correctness", "threshold": "PM2.5 within 20% and CO2 within 10%/100 ppm of reference over 24 h", "measure": "side-by-side comparison, logged", "why": "consumer-grade sensor class limits; human confirmed adequate for 'open a window' decisions" },
+      { "name": "reliability", "threshold": ">= 99% of 60 s readings delivered over any 30-day window; auto-recovers from Wi-Fi and power loss", "measure": "gap count in the history store", "why": "lesson: DIY sensors die of reconnect bugs, not code" },
+      { "name": "security", "threshold": "no readings leave the home network unless the person opts in; no default credentials", "measure": "network capture during 24 h; credential audit", "why": "lesson: cloud shutdowns lose data; privacy by default" },
+      { "name": "cost_build", "threshold": "<= 200 USD all-in including canvass samples", "measure": "cost.json build.total", "why": "ceiling" },
+      { "name": "cost_run", "threshold": "<= 3 USD/month including power", "measure": "cost.json run_monthly.total; opex_actual", "why": "ceiling" },
+      { "name": "cost_unit", "threshold": "<= 150 USD per monitor", "measure": "cost.json unit.total_per_unit", "why": "ceiling" },
+      { "name": "usability", "threshold": "a non-specialist can set a threshold and read history on the phone without documentation", "measure": "one unassisted task session", "why": "single operator" },
+      { "name": "maintainability", "threshold": "a stranger can rebuild from the written instructions in under 2 h; firmware updatable over the air", "measure": "validator clean reproduction time", "why": "3-year lifetime" },
+      { "name": "sustainability", "threshold": "< 3 W average draw; sensor replaceable without tools", "measure": "plug-in power meter; replacement trial", "why": "always-on device; sensor is a consumable" }
+    ],
+    "flags": [],
+    "lessons_applied": ["Graveyard is the real spec: plan for drift and reconnects", "run cost is a number, not a word"],
+    "set_by": { "by": "barkeeper", "role": "barkeeper", "at": "2026-10-23T10:30:00Z", "decision": "approve" }
+  },
+  "done_condition": {
+    "statement": "The room's PM2.5 and CO2 are on my phone, a threshold crossing notifies me within a minute, 30 days of history are visible, and it has run a month without my touching it.",
+    "test": ["Induce a CO2 rise (breathe near sensor) and time the phone notification: <= 60 s", "Open history and confirm 30 continuous days", "Check uptime log: no manual interventions in the last 30 days", "Confirm cost.json run_monthly.total <= 3 USD and the first month's bill matches"]
+  },
+  "lessons_read": ["memory/LESSONS.md#protocol", "memory/LESSONS.md#physical-hardware"],
+  "questions_asked": [
+    { "question": "One room or the whole home?", "answer": "One room, the bedroom.", "asked_at": "2026-10-23T09:10:00Z" },
+    { "question": "Is it acceptable for readings to go to a cloud service?", "answer": "Prefer not; local is better.", "asked_at": "2026-10-23T09:11:00Z" },
+    { "question": "Budget: how much to build, how much per month?", "answer": "About 200 to build, a few dollars a month at most.", "asked_at": "2026-10-23T09:12:00Z" }
+  ],
+  "signoffs": [
+    { "by": "listener", "role": "listener", "at": "2026-10-23T11:00:00Z", "decision": "approve" },
+    { "by": "barkeeper", "role": "barkeeper", "at": "2026-10-23T11:00:00Z", "decision": "approve" },
+    { "by": "human", "role": "human", "at": "2026-10-23T11:30:00Z", "decision": "approve" }
+  ],
+  "provenance": { "produced_by": "listener", "produced_at": "2026-10-23T11:00:00Z", "inputs": [ { "artifact": "wish", "path": "wish.json" } ] }
+}

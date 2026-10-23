@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/message.schema.json",
+  "title": "Message",
+  "description": "The envelope for every inter-agent communication in WCKD.",
+  "type": "object",
+  "required": ["id", "at", "from", "to", "project", "phase", "type", "subject", "body"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "from": { "$ref": "common.schema.json#/$defs/role" },
+    "to": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/role" } },
+    "project": { "type": "string" },
+    "phase": { "type": "string", "enum": ["W", "C", "K", "D", "operation"] },
+    "type": { "type": "string", "enum": ["handoff", "request", "finding", "verdict", "escalation", "gate", "broadcast", "lesson", "bar_change_request"] },
+    "subject": { "type": "string" },
+    "body": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/ref" } },
+    "evidence": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence" } },
+    "confidence": { "$ref": "common.schema.json#/$defs/confidence" },
+    "positions": { "type": "array", "description": "for escalations: each side, written down", "items": { "type": "object", "required": ["held_by", "position"], "properties": { "held_by": { "$ref": "common.schema.json#/$defs/role" }, "position": { "type": "string" } } } },
+    "proposed_decision": { "type": "string" },
+    "proposed_phase": { "type": "string", "enum": ["W", "C", "K", "D"] },
+    "severity": { "$ref": "common.schema.json#/$defs/severity" },
+    "needs_reply_by": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "in_reply_to": { "$ref": "common.schema.json#/$defs/id" }
+  },
+  "additionalProperties": false
+}

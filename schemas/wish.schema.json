@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/wish.schema.json",
+  "title": "Wish",
+  "description": "The human's words, verbatim. Created by `wckd new`.",
+  "type": "object",
+  "required": ["id", "text", "by", "at"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "text": { "type": "string", "minLength": 1 },
+    "by": { "type": "string" },
+    "at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "context": { "type": "string", "description": "anything else the human said, verbatim" }
+  },
+  "additionalProperties": false
+}

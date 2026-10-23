@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/cost.schema.json",
+  "title": "Cost ledger",
+  "description": "Build, run, unit, exit and not-doing costs, physical and digital, with confidence classes and horizons. Output of K3; re-estimated at every later gate.",
+  "type": "object",
+  "required": ["id", "blueprint_id", "currency", "confidence_class", "build", "run_monthly", "exit", "not_doing", "keep_costs", "horizons", "assumptions", "sensitivity", "provenance"],
+  "$defs": {
+    "line": { "type": "object", "required": ["item", "amount"], "properties": { "item": { "type": "string" }, "amount": { "type": "number" }, "confidence_class": { "$ref": "common.schema.json#/$defs/confidence_class" }, "source": { "type": "string" }, "priced_at": { "$ref": "common.schema.json#/$defs/date" }, "note": { "type": "string" } }, "additionalProperties": false },
+    "lines": { "type": "array", "items": { "$ref": "#/$defs/line" } }
+  },
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "blueprint_id": { "$ref": "common.schema.json#/$defs/id" },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "confidence_class": { "$ref": "common.schema.json#/$defs/confidence_class" },
+    "build": { "type": "object", "required": ["people", "tools", "materials", "prototypes", "nre", "certification", "total"], "properties": { "people": { "$ref": "#/$defs/lines" }, "tools": { "$ref": "#/$defs/lines" }, "materials": { "$ref": "#/$defs/lines" }, "prototypes": { "$ref": "#/$defs/lines" }, "nre": { "$ref": "#/$defs/lines" }, "certification": { "$ref": "#/$defs/lines" }, "canvass_spent": { "type": "number" }, "total": { "type": "number" } } },
+    "run_monthly": { "type": "object", "required": ["digital", "physical", "people", "total"], "properties": { "digital": { "$ref": "#/$defs/lines", "description": "compute, storage, egress, licenses, saas, support, patching" }, "physical": { "$ref": "#/$defs/lines", "description": "power, consumables, spares, calibration, maintenance labor, disposal" }, "people": { "$ref": "#/$defs/lines", "description": "on-call, support, maintenance hours" }, "total": { "type": "number" } } },
+    "unit": { "type": "object", "required": ["volume", "bom", "assembly", "test", "packaging", "shipping", "warranty_reserve", "total_per_unit"], "properties": { "volume": { "type": "integer", "minimum": 1 }, "bom": { "$ref": "#/$defs/lines" }, "assembly": { "$ref": "#/$defs/lines" }, "test": { "$ref": "#/$defs/lines" }, "packaging": { "$ref": "#/$defs/lines" }, "shipping": { "$ref": "#/$defs/lines" }, "warranty_reserve": { "$ref": "#/$defs/lines" }, "moq_notes": { "type": "string" }, "lead_time_notes": { "type": "string" }, "total_per_unit": { "type": "number" } } },
+    "exit": { "type": "object", "required": ["migration", "decommission", "disposal", "kept_dependency_exits", "total"], "properties": { "migration": { "$ref": "#/$defs/lines" }, "decommission": { "$ref": "#/$defs/lines" }, "disposal": { "$ref": "#/$defs/lines" }, "kept_dependency_exits": { "$ref": "#/$defs/lines" }, "total": { "type": "number" } } },
+    "not_doing": { "type": "object", "required": ["monthly", "basis"], "properties": { "monthly": { "type": "number" }, "basis": { "type": "string" } } },
+    "keep_costs": { "$ref": "#/$defs/lines", "description": "licenses, fees, lock-in for every KEEP decision" },
+    "horizons": { "type": "object", "required": ["m1", "m12", "m36"], "properties": { "m1": { "type": "number" }, "m12": { "type": "number" }, "m36": { "type": "number" } } },
+    "within_ceiling": { "type": "boolean" },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "sensitivity": { "type": "array", "items": { "type": "object", "required": ["variable", "effect"], "properties": { "variable": { "type": "string" }, "effect": { "type": "string" } } } },
+    "reestimates": { "type": "array", "items": { "type": "object", "required": ["at_gate", "at", "build_total", "run_monthly_total", "variance_within_class"], "properties": { "at_gate": { "type": "string" }, "at": { "$ref": "common.schema.json#/$defs/timestamp" }, "build_total": { "type": "number" }, "run_monthly_total": { "type": "number" }, "variance_within_class": { "type": "boolean" }, "note": { "type": "string" } } } },
+    "signoffs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/signoff" } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}

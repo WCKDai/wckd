@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/brief.schema.json",
+  "title": "Brief",
+  "description": "The want, structured, with the Bar. Output of phase W.",
+  "type": "object",
+  "required": ["id", "wish", "restated", "realm", "capabilities", "constraints", "non_goals", "horizon", "budget_ceiling", "bar", "done_condition", "lessons_read", "questions_asked", "provenance"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "wish": { "type": "string", "description": "verbatim" },
+    "restated": { "type": "string" },
+    "realm": { "$ref": "common.schema.json#/$defs/realm" },
+    "freshness_days": { "type": "integer", "minimum": 1, "default": 90 },
+    "capabilities": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "priority", "measurable"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "statement": { "type": "string", "description": "a <user> can <observe/do> <what> <under what condition>; no solutions named" },
+          "priority": { "$ref": "common.schema.json#/$defs/priority" },
+          "measurable": { "type": "boolean" },
+          "measure": { "type": "string" },
+          "confidence": { "$ref": "common.schema.json#/$defs/confidence" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "constraints": { "type": "array", "items": { "type": "object", "required": ["kind", "statement"], "properties": { "kind": { "type": "string", "enum": ["time", "place", "people", "law", "existing_system", "stated_preference", "other"] }, "statement": { "type": "string" } } } },
+    "non_goals": { "type": "array", "items": { "type": "string" } },
+    "stakeholders": { "type": "array", "items": { "type": "string" } },
+    "horizon": { "type": "object", "required": ["first_value", "lifetime"], "properties": { "first_value": { "type": "string" }, "lifetime": { "type": "string" } } },
+    "budget_ceiling": {
+      "type": "object", "required": ["build", "run_monthly"],
+      "properties": {
+        "build": { "$ref": "common.schema.json#/$defs/money" },
+        "run_monthly": { "$ref": "common.schema.json#/$defs/money" },
+        "unit": { "$ref": "common.schema.json#/$defs/money" }
+      }
+    },
+    "bar": {
+      "type": "object",
+      "required": ["in_scope", "dimensions", "set_by"],
+      "properties": {
+        "in_scope": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/bar_dimension" } },
+        "dimensions": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "threshold", "measure", "why"],
+            "properties": {
+              "name": { "$ref": "common.schema.json#/$defs/bar_dimension" },
+              "threshold": { "type": "string" },
+              "measure": { "type": "string", "description": "the instrument, test or source that decides" },
+              "why": { "type": "string" },
+              "standard": { "type": "string", "description": "named standard and version, if any" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "flags": { "type": "array", "items": { "type": "string" }, "description": "thresholds unrealistic at the budget ceiling, with evidence" },
+        "lessons_applied": { "type": "array", "items": { "type": "string" } },
+        "set_by": { "$ref": "common.schema.json#/$defs/signoff" },
+        "changes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/bar_change" } }
+      },
+      "additionalProperties": false
+    },
+    "done_condition": { "type": "object", "required": ["statement", "test"], "properties": { "statement": { "type": "string" }, "test": { "type": "array", "minItems": 1, "items": { "type": "string" } } } },
+    "lessons_read": { "type": "array", "items": { "type": "string" } },
+    "questions_asked": { "type": "array", "maxItems": 5, "items": { "type": "object", "required": ["question", "answer"], "properties": { "question": { "type": "string" }, "answer": { "type": "string" }, "asked_at": { "$ref": "common.schema.json#/$defs/timestamp" } } } },
+    "signoffs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/signoff" } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}

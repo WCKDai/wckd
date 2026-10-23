@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wckd.protocol/schemas/workorder.schema.json",
+  "title": "Work order",
+  "description": "The unit of build, proof and break.",
+  "type": "object",
+  "required": ["id", "plan_id", "component_id", "realm", "spec", "acceptance", "deliverables", "assigned_to", "status", "build_log", "provenance"],
+  "properties": {
+    "id": { "$ref": "common.schema.json#/$defs/id" },
+    "plan_id": { "$ref": "common.schema.json#/$defs/id" },
+    "component_id": { "$ref": "common.schema.json#/$defs/id" },
+    "capability_ids": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "realm": { "$ref": "common.schema.json#/$defs/realm" },
+    "spec": { "type": "string" },
+    "acceptance": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["criterion", "bar_dimension"], "properties": { "criterion": { "type": "string" }, "bar_dimension": { "$ref": "common.schema.json#/$defs/bar_dimension" }, "measure": { "type": "string" } } } },
+    "inputs": { "type": "array", "items": { "type": "string" } },
+    "deliverables": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "depends_on": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "graves_to_read": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/id" } },
+    "assigned_to": { "type": "object", "required": ["builder", "validator", "breaker"], "properties": { "builder": { "type": "string" }, "validator": { "type": "string" }, "breaker": { "type": "string" } } },
+    "status": { "type": "string", "enum": ["queued", "building", "built", "proving", "proven", "breaking", "hardened", "blocked", "cancelled"] },
+    "blocked_by": { "type": "string" },
+    "build_log": { "type": "array", "items": { "type": "object", "required": ["at", "by", "did", "saw"], "properties": { "at": { "$ref": "common.schema.json#/$defs/timestamp" }, "by": { "type": "string" }, "did": { "type": "string" }, "ran": { "type": "string" }, "saw": { "type": "string" }, "evidence": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence" } } } } },
+    "as_built_deviations": { "type": "array", "items": { "type": "string" } },
+    "physical": { "type": "object", "properties": { "drawings": { "type": "array", "items": { "type": "string" } }, "bom_rev": { "type": "string" }, "firmware_version": { "type": "string" }, "serials": { "type": "array", "items": { "type": "string" } } } },
+    "provenance": { "$ref": "common.schema.json#/$defs/provenance" }
+  },
+  "additionalProperties": false
+}
