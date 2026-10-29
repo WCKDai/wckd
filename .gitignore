@@ -2,3 +2,5 @@ projects/*
 __pycache__/
 .turns/
 *.tmp
+.agents/evidence/
+.worktrees/
