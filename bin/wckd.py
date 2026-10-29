@@ -1512,7 +1512,12 @@ def cmd_run(a):
         env = dict(os.environ, WCKD_ROOT=str(ROOT), WCKD_SLUG=a.slug, WCKD_STEP=step["id"],
                    WCKD_ROLE=step["agent"], WCKD_GATE=gate["id"], WCKD_PROMPT=str(pf))
         import subprocess
-        r = subprocess.run(f"cd {_shq(str(pdir))} && {a.agent} < {_shq(str(pf))}", shell=True, env=env).returncode
+        # --agent is the operator's own command, so it keeps shell semantics (pipes,
+        # redirections). Repository-controlled values (project dir, prompt path) are
+        # passed as cwd and stdin instead of being interpolated into the command line.
+        with open(pf, "rb") as prompt:
+            # nosemgrep: agents.config.eng-python-subprocess-shell-true
+            r = subprocess.run(a.agent, shell=True, cwd=str(pdir), stdin=prompt, env=env).returncode
         if r != 0:
             print(f"[run] agent exited {r}; stopping. Read the agent's output above, fix the role prompt, rerun.")
             return
